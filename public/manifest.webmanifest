@@ -1,0 +1,17 @@
+{
+  "name": "DDCourse — Learning Player",
+  "short_name": "DDCourse",
+  "description": "一个轻量、私密、会记住学习进度的本地课程视频播放器。",
+  "lang": "zh-CN",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#090a08",
+  "theme_color": "#111310",
+  "categories": ["education", "productivity", "video"],
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
