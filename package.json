@@ -3,6 +3,7 @@
   "version": "1.1.0",
   "description": "一个轻量、私密、会记住学习进度的本地课程视频播放器。",
   "author": "DDCourse Contributors",
+  "license": "AGPL-3.0",
   "private": true,
   "main": "electron/main.cjs",
   "engines": {
