@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { access, readFile } from "node:fs/promises";
 import test from "node:test";
+import { createProgressBackup, parseProgressBackup, progressBackupFilename } from "../app/progress-backup.mjs";
 
 test("desktop build is configured as DDCourse", async () => {
   const pkg = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
@@ -29,4 +30,26 @@ test("required application icons exist", async () => {
     access(new URL("../public/icons/icon-192.png", import.meta.url)),
     access(new URL("../public/icons/icon-512.png", import.meta.url)),
   ]);
+});
+
+test("progress backup round-trips using the documented versioned format", () => {
+  const now = new Date("2026-07-11T08:30:00.000Z");
+  const progress = {
+    "lesson.mp4::100::200": {
+      time: 42,
+      duration: 120,
+      done: false,
+      updatedAt: now.toISOString(),
+      speed: 1.25,
+    },
+  };
+  const backup = createProgressBackup(progress, now);
+  assert.deepEqual(parseProgressBackup(JSON.parse(JSON.stringify(backup))), backup);
+  assert.equal(progressBackupFilename(now), "DDCourse-progress-2026-07-11.json");
+});
+
+test("progress import rejects wrong apps, versions, and malformed records", () => {
+  assert.throws(() => parseProgressBackup({ app: "Other", progress: {} }));
+  assert.throws(() => parseProgressBackup({ app: "DDCourse", formatVersion: 2, progress: {} }));
+  assert.throws(() => parseProgressBackup({ app: "DDCourse", progress: { lesson: { time: -1 } } }));
 });

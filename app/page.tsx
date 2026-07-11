@@ -1,6 +1,7 @@
 "use client";
 
 import { ChangeEvent, DragEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createProgressBackup, parseProgressBackup, progressBackupFilename, type ProgressMap } from "./progress-backup.mjs";
 
 type CourseFile = {
   name: string;
@@ -13,8 +14,6 @@ type CourseFile = {
 type DesktopFolder = { folderName: string; folderPath: string; files: CourseFile[] };
 type StudyNote = { fileId: string; fileName: string; time: number; text: string; createdAt: string };
 type StudyBookmark = { fileId: string; fileName: string; time: number; label?: string; createdAt: string };
-type RecordItem = { time: number; duration: number; done: boolean; updatedAt: string; speed?: number };
-type ProgressMap = Record<string, RecordItem>;
 type Collection = { key: string; name: string; files: CourseFile[] };
 type InstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -63,37 +62,32 @@ export default function Home() {
   const importRef = useRef<HTMLInputElement>(null);
   const objectUrlRef = useRef("");
   const lastTickRef = useRef(0);
+  const lastWeekSaveRef = useRef(0);
   const [allFiles, setAllFiles] = useState<CourseFile[]>([]);
   const [collectionKey, setCollectionKey] = useState("");
   const [activeId, setActiveId] = useState("");
-  const [progress, setProgress] = useState<ProgressMap>({});
+  const [progress, setProgress] = useState<ProgressMap>(() => readJson(PROGRESS_KEY, {}));
   const [query, setQuery] = useState("");
   const [unfinished, setUnfinished] = useState(false);
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(() => typeof window !== "undefined" && localStorage.getItem("lumacourse_sidebar") === "1");
   const [folderName, setFolderName] = useState("");
-  const [speed, setSpeed] = useState(1);
+  const [speed, setSpeed] = useState(() => typeof window === "undefined" ? 1 : Number(localStorage.getItem(SPEED_KEY)) || 1);
   const [compressor, setCompressor] = useState(false);
-  const [weekSeconds, setWeekSeconds] = useState(0);
+  const [weekSeconds, setWeekSeconds] = useState(() => {
+    const week = readJson<{ week: string; seconds: number }>(WEEK_KEY, { week: mondayKey(), seconds: 0 });
+    return week.week === mondayKey() ? week.seconds : 0;
+  });
   const [dragging, setDragging] = useState(false);
   const [notice, setNotice] = useState("");
   const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(null);
-  const [installed, setInstalled] = useState(false);
-  const [bookmarks, setBookmarks] = useState<StudyBookmark[]>([]);
-  const [notes, setNotes] = useState<StudyNote[]>([]);
+  const [installed, setInstalled] = useState(() => typeof window !== "undefined" && (window.matchMedia("(display-mode: standalone)").matches || navigator.userAgent.includes("Electron")));
+  const [bookmarks, setBookmarks] = useState<StudyBookmark[]>(() => readJson("ddcourse_bookmarks_v1", []));
+  const [notes, setNotes] = useState<StudyNote[]>(() => readJson("ddcourse_notes_v1", []));
   const [isFullscreen, setIsFullscreen] = useState(false);
   const notesReadyRef = useRef(false);
   const audioRef = useRef<{ ctx: AudioContext; node: DynamicsCompressorNode } | null>(null);
 
-  useEffect(() => {
-    setProgress(readJson(PROGRESS_KEY, {}));
-    setCollapsed(localStorage.getItem("lumacourse_sidebar") === "1");
-    setSpeed(Number(localStorage.getItem(SPEED_KEY)) || 1);
-    const week = readJson<{ week: string; seconds: number }>(WEEK_KEY, { week: mondayKey(), seconds: 0 });
-    setWeekSeconds(week.week === mondayKey() ? week.seconds : 0);
-    setBookmarks(readJson("ddcourse_bookmarks_v1", []));
-    setNotes(readJson("ddcourse_notes_v1", []));
-    notesReadyRef.current = true;
-  }, []);
+  useEffect(() => { notesReadyRef.current = true; }, []);
 
   useEffect(() => {
     if (!notesReadyRef.current || !window.ddcourseDesktop) return;
@@ -103,6 +97,8 @@ export default function Home() {
   useEffect(() => {
     const desktop = window.ddcourseDesktop;
     if (!desktop) return;
+    // The restore callback runs asynchronously after all component callbacks are initialized.
+    // eslint-disable-next-line react-hooks/immutability
     desktop.restoreFolder().then(result => { if (result?.files.length) loadDesktopFolder(result); }).catch(() => undefined);
   }, []);
 
@@ -114,8 +110,6 @@ export default function Home() {
 
   useEffect(() => {
     if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => undefined);
-    const standalone = window.matchMedia("(display-mode: standalone)").matches || navigator.userAgent.includes("Electron");
-    setInstalled(standalone);
     const capture = (event: Event) => { event.preventDefault(); setInstallPrompt(event as InstallPromptEvent); };
     const complete = () => { setInstalled(true); setInstallPrompt(null); setNotice("DDCourse 已安装完成"); };
     window.addEventListener("beforeinstallprompt", capture);
@@ -217,6 +211,7 @@ export default function Home() {
     if (!current || activeId) return;
     const last = readJson<{ collection: string; id: string } | null>(LAST_KEY, null);
     const resume = current.files.find(f => idOf(f) === last?.id && !progress[idOf(f)]?.done) || current.files.find(f => (progress[idOf(f)]?.time || 0) > 0 && !progress[idOf(f)]?.done);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (resume) setNotice(`可继续播放：${cleanName(resume.name)}`);
   }, [current, activeId, progress]);
 
@@ -232,7 +227,15 @@ export default function Home() {
   const addWeekTime = () => {
     const video = videoRef.current; if (!video) return;
     const now = video.currentTime, delta = now - lastTickRef.current; lastTickRef.current = now;
-    if (delta > 0 && delta < 2) setWeekSeconds(prev => { const n = prev + delta; localStorage.setItem(WEEK_KEY, JSON.stringify({ week: mondayKey(), seconds: n })); return n; });
+    if (delta > 0 && delta < 2) setWeekSeconds(prev => {
+      const next = prev + delta;
+      const timestamp = Date.now();
+      if (timestamp - lastWeekSaveRef.current >= 5000) {
+        localStorage.setItem(WEEK_KEY, JSON.stringify({ week: mondayKey(), seconds: next }));
+        lastWeekSaveRef.current = timestamp;
+      }
+      return next;
+    });
   };
   const step = (dir: number) => { const v = videoRef.current; if (v && Number.isFinite(v.duration)) v.currentTime = Math.max(0, Math.min(v.duration, v.currentTime + dir * 10)); };
   const adjacent = (dir: number) => { const target = files[activeIndex + dir]; if (target) playFile(target); };
@@ -255,7 +258,7 @@ export default function Home() {
       if ((e.target as HTMLElement)?.matches("input,textarea,[contenteditable=true]")) return;
       if (SPEEDS[e.code]) { e.preventDefault(); setSpeed(SPEEDS[e.code]); return; }
       if (!activeFile) return;
-      if (e.code === "Space") { e.preventDefault(); const v = videoRef.current!; v.paused ? v.play() : v.pause(); }
+      if (e.code === "Space") { e.preventDefault(); const v = videoRef.current!; if (v.paused) v.play(); else v.pause(); }
       if (e.code === "ArrowLeft") { e.preventDefault(); step(-1); }
       if (e.code === "ArrowRight") { e.preventDefault(); step(1); }
       if (e.code === "BracketLeft" || e.code === "KeyP") adjacent(-1);
@@ -265,12 +268,27 @@ export default function Home() {
   });
 
   const exportProgress = () => {
-    const data = JSON.stringify({ app: "DDCourse", exportedAt: new Date().toISOString(), progress }, null, 2);
-    const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([data], { type: "application/json" })); a.download = "lumacourse-progress.json"; a.click(); URL.revokeObjectURL(a.href);
+    const now = new Date();
+    const data = JSON.stringify(createProgressBackup(progress, now), null, 2);
+    const url = URL.createObjectURL(new Blob([data], { type: "application/json" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = progressBackupFilename(now);
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+    setNotice("学习进度备份已导出");
   };
   const importProgress = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]; if (!file) return;
-    try { const data = JSON.parse(await file.text()); if (!data.progress || typeof data.progress !== "object") throw new Error(); persist({ ...progress, ...data.progress }); setNotice("学习进度已成功导入"); } catch { setNotice("这不是有效的 DDCourse 进度文件"); }
+    try {
+      const backup = parseProgressBackup(JSON.parse(await file.text()));
+      persist({ ...progress, ...backup.progress });
+      setNotice(`学习进度已成功导入（${Object.keys(backup.progress).length} 条）`);
+    } catch {
+      setNotice("这不是有效的 DDCourse 进度文件");
+    } finally {
+      e.target.value = "";
+    }
   };
   const resetCurrent = () => { if (!current || !confirm(`清空“${current.name}”的全部播放进度？`)) return; const next = { ...progress }; current.files.forEach(f => delete next[idOf(f)]); persist(next); };
   const addBookmark = () => {
@@ -357,7 +375,7 @@ export default function Home() {
           {activeFile && <div className="learning-map"><div className="map-head"><div><span>LEARNING MAP</span><strong>学习地图</strong></div><div className="map-actions"><button onClick={showNotesLocation}>⌖ 笔记位置</button><button onClick={addBookmark}>★ 收藏重点</button><button onClick={addNote}>▤ 添加笔记</button></div></div><div className="map-track"><i className="learned" style={{width:`${progress[idOf(activeFile)]?.duration ? Math.min(100,(progress[idOf(activeFile)]?.time || 0)/(progress[idOf(activeFile)]?.duration || 1)*100) : 0}%`}}/>{bookmarks.filter(item=>item.fileId===idOf(activeFile)).map((item,index)=><button key={`b-${index}`} className="marker bookmark" style={{left:`${videoRef.current?.duration ? item.time/videoRef.current.duration*100 : 0}%`}} onClick={()=>{if(videoRef.current)videoRef.current.currentTime=item.time}} title={`${item.label || "重点"} ${timeLabel(item.time)}`}/>)}{notes.filter(note=>note.fileId===idOf(activeFile)).map((note,index)=><button key={`n-${index}`} className="marker note" style={{left:`${videoRef.current?.duration ? note.time/videoRef.current.duration*100 : 0}%`}} onClick={()=>{if(videoRef.current)videoRef.current.currentTime=note.time}} title={note.text}/>)}</div><div className="map-legend"><span><i className="blue"/>当前学习</span><span><i className="green"/>已学习</span><span><i className="yellow"/>收藏重点</span><span><i className="note-dot"/>课程笔记</span></div><div className="marker-list">{bookmarks.filter(item=>item.fileId===idOf(activeFile)).map(item=><div className="marker-row" key={item.createdAt}><button className="jump" onClick={()=>{if(videoRef.current)videoRef.current.currentTime=item.time}}><b>★ {timeLabel(item.time)}</b><span>{item.label || "重点"}</span></button><button onClick={()=>editBookmark(item)}>编辑</button><button className="delete" onClick={()=>deleteBookmark(item)}>删除</button></div>)}{notes.filter(item=>item.fileId===idOf(activeFile)).map(item=><div className="marker-row" key={item.createdAt}><button className="jump" onClick={()=>{if(videoRef.current)videoRef.current.currentTime=item.time}}><b>▤ {timeLabel(item.time)}</b><span>{item.text}</span></button><button onClick={()=>editNote(item)}>编辑</button><button className="delete" onClick={()=>deleteNote(item)}>删除</button></div>)}</div></div>}
         </div>
         <div className="control-deck">
-          <div className="transport"><button onClick={() => adjacent(-1)} disabled={activeIndex <= 0} aria-label="上一节">|‹</button><button onClick={() => step(-1)}>−10</button><button className="play" onClick={() => { const v = videoRef.current; if (!v) return; v.paused ? v.play() : v.pause(); }}>▶</button><button onClick={() => step(1)}>+10</button><button onClick={() => adjacent(1)} disabled={activeIndex < 0 || activeIndex >= files.length - 1} aria-label="下一节">›|</button></div>
+          <div className="transport"><button onClick={() => adjacent(-1)} disabled={activeIndex <= 0} aria-label="上一节">|‹</button><button onClick={() => step(-1)}>−10</button><button className="play" onClick={() => { const v = videoRef.current; if (!v) return; if (v.paused) v.play(); else v.pause(); }}>▶</button><button onClick={() => step(1)}>+10</button><button onClick={() => adjacent(1)} disabled={activeIndex < 0 || activeIndex >= files.length - 1} aria-label="下一节">›|</button></div>
           <div className="tools"><button className={`voice ${compressor ? "on" : ""}`} onClick={toggleCompressor}><i /> 人声增强</button><label className="speed"><span>播放速度</span><input type="range" min="0.5" max="3" step="0.05" value={speed} onChange={e => setSpeed(Number(e.target.value))}/><b>{speed.toFixed(2)}×</b></label></div>
         </div>
       </section>

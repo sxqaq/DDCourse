@@ -9,10 +9,21 @@ const eslintConfig = defineConfig([
   globalIgnores([
     // Default ignores of eslint-config-next:
     ".next/**",
+    ".vinext/**",
+    "desktop-dist/**",
+    "dist/**",
+    "release/**",
+    "node_modules/**",
+    "electron/**/*.cjs",
     "out/**",
     "build/**",
     "next-env.d.ts",
   ]),
+  {
+    rules: {
+      "react-hooks/refs": "off",
+    },
+  },
 ]);
 
 export default eslintConfig;
