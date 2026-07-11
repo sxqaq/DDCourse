@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { access, readFile } from "node:fs/promises";
 import test from "node:test";
 import { createProgressBackup, normalizeProgressId, normalizeProgressMap, parseProgressBackup, progressBackupFilename, progressId } from "../app/progress-backup.mjs";
+import { addWeeklySeconds, localMondayKey } from "../app/study-time.mjs";
 
 test("desktop build is configured as DDCourse", async () => {
   const pkg = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
@@ -67,4 +68,19 @@ test("legacy ID collisions keep the most recently updated record", () => {
     "Course/lesson.mp4::100::1": older,
     "Course/lesson.mp4::100::2": newer,
   }), { "Course/lesson.mp4::100": newer });
+});
+
+test("weekly study time uses local Monday keys across month and year boundaries", () => {
+  assert.equal(localMondayKey(new Date(2026, 0, 1, 12)), "2025-12-29");
+  assert.equal(localMondayKey(new Date(2026, 7, 3, 0, 30)), "2026-08-03");
+  assert.deepEqual(addWeeklySeconds({ week: "2026-07-06", seconds: 120 }, 5, new Date(2026, 6, 12)), { week: "2026-07-06", seconds: 125 });
+  assert.deepEqual(addWeeklySeconds({ week: "2026-07-06", seconds: 120 }, 5, new Date(2026, 6, 13)), { week: "2026-07-13", seconds: 5 });
+});
+
+test("desktop course scanning is asynchronous and skips symbolic links", async () => {
+  const main = await readFile(new URL("../electron/main.cjs", import.meta.url), "utf8");
+  assert.match(main, /fs\.promises\.readdir/);
+  assert.match(main, /fs\.promises\.stat/);
+  assert.match(main, /isSymbolicLink\(\)/);
+  assert.doesNotMatch(main, /readdirSync|statSync/);
 });

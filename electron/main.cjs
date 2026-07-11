@@ -8,6 +8,7 @@ app.setName("DDCourse");
 const VIDEO_RE = /\.(mp4|webm|ogg|mov|m4v|mkv|avi)$/i;
 const settingsPath = () => path.join(app.getPath("userData"), "settings.json");
 const notesPath = () => path.join(app.getPath("documents"), "DDCourse", "学习笔记.json");
+const MAX_NOTES_BYTES = 5 * 1024 * 1024;
 
 function readSettings() {
   try { return JSON.parse(fs.readFileSync(settingsPath(), "utf8")); } catch { return {}; }
@@ -18,25 +19,41 @@ function saveSettings(settings) {
   fs.writeFileSync(settingsPath(), JSON.stringify(settings, null, 2), "utf8");
 }
 
-function scanFolder(root) {
+async function writeJsonAtomic(filePath, payload) {
+  const data = JSON.stringify(payload, null, 2);
+  if (Buffer.byteLength(data, "utf8") > MAX_NOTES_BYTES) throw new Error("Notes payload is too large");
+  await fs.promises.mkdir(path.dirname(filePath), { recursive: true });
+  const temporaryPath = `${filePath}.tmp`;
+  await fs.promises.writeFile(temporaryPath, data, "utf8");
+  await fs.promises.rename(temporaryPath, filePath);
+}
+
+async function scanFolder(root) {
   const files = [];
-  function walk(folder) {
-    for (const entry of fs.readdirSync(folder, { withFileTypes: true })) {
+  async function walk(folder) {
+    let entries;
+    try { entries = await fs.promises.readdir(folder, { withFileTypes: true }); }
+    catch (error) { console.warn(`Skipping unreadable course folder: ${folder}`, error); return; }
+    for (const entry of entries) {
       const fullPath = path.join(folder, entry.name);
-      if (entry.isDirectory()) walk(fullPath);
+      if (entry.isSymbolicLink()) continue;
+      if (entry.isDirectory()) await walk(fullPath);
       else if (VIDEO_RE.test(entry.name)) {
-        const stat = fs.statSync(fullPath);
-        files.push({
-          name: entry.name,
-          size: stat.size,
-          lastModified: stat.mtimeMs,
-          webkitRelativePath: path.relative(path.dirname(root), fullPath).split(path.sep).join("/"),
-          nativeUrl: pathToFileURL(fullPath).href,
-        });
+        try {
+          const stat = await fs.promises.stat(fullPath);
+          files.push({
+            name: entry.name,
+            size: stat.size,
+            lastModified: stat.mtimeMs,
+            webkitRelativePath: path.relative(path.dirname(root), fullPath).split(path.sep).join("/"),
+            nativeUrl: pathToFileURL(fullPath).href,
+          });
+        } catch (error) { console.warn(`Skipping unreadable course file: ${fullPath}`, error); }
       }
     }
   }
-  if (fs.existsSync(root)) walk(root);
+  await walk(root);
+  files.sort((a, b) => a.webkitRelativePath.localeCompare(b.webkitRelativePath, "zh-CN", { numeric: true }));
   return { folderName: path.basename(root), folderPath: root, files };
 }
 
@@ -45,27 +62,30 @@ ipcMain.handle("course-folder:choose", async () => {
   if (result.canceled || !result.filePaths[0]) return null;
   const folderPath = result.filePaths[0];
   saveSettings({ ...readSettings(), lastFolder: folderPath });
-  return scanFolder(folderPath);
+  return await scanFolder(folderPath);
 });
 
-ipcMain.handle("course-folder:restore", () => {
+ipcMain.handle("course-folder:restore", async () => {
   const folderPath = readSettings().lastFolder;
   if (!folderPath || !fs.existsSync(folderPath)) return null;
-  return scanFolder(folderPath);
+  return await scanFolder(folderPath);
 });
 
-ipcMain.handle("notes:save-and-show", (_event, payload) => {
+ipcMain.handle("notes:load", async () => {
+  try { return JSON.parse(await fs.promises.readFile(notesPath(), "utf8")); }
+  catch (error) { if (error?.code !== "ENOENT") console.warn("Unable to load notes", error); return null; }
+});
+
+ipcMain.handle("notes:save-and-show", async (_event, payload) => {
   const filePath = notesPath();
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  fs.writeFileSync(filePath, JSON.stringify(payload, null, 2), "utf8");
+  await writeJsonAtomic(filePath, payload);
   shell.showItemInFolder(filePath);
   return filePath;
 });
 
-ipcMain.handle("notes:save", (_event, payload) => {
+ipcMain.handle("notes:save", async (_event, payload) => {
   const filePath = notesPath();
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  fs.writeFileSync(filePath, JSON.stringify(payload, null, 2), "utf8");
+  await writeJsonAtomic(filePath, payload);
   return filePath;
 });
 
