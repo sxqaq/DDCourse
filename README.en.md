@@ -27,6 +27,7 @@ The entire project—including product design, source code, tests, build and rel
 
 ## Documentation
 
+- [User guide](./docs/USER_GUIDE.md)
 - [Architecture](./docs/ARCHITECTURE.md)
 - [Development and maintenance](./docs/DEVELOPMENT.md)
 - [Storage and privacy](./docs/STORAGE_AND_PRIVACY.md)
