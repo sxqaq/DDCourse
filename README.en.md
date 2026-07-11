@@ -6,6 +6,10 @@ English · [简体中文](./README.md)
 
 DDCourse is a lightweight, local-first learning player. It organizes lessons, tracks progress, bookmarks, and notes while keeping every video on your own device.
 
+## AI authorship statement
+
+The entire project—including product design, source code, tests, build and release configuration, documentation, and this README—was created by GPT-5.6.
+
 ## Features
 
 - Local folder and multi-file playback
