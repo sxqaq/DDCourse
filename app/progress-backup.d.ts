@@ -15,3 +15,6 @@ export type ProgressBackup = {
 export function createProgressBackup(progress: ProgressMap, now?: Date): ProgressBackup;
 export function parseProgressBackup(value: unknown): ProgressBackup;
 export function progressBackupFilename(now?: Date): string;
+export function progressId(path: string, size: number): string;
+export function normalizeProgressId(id: string): string;
+export function normalizeProgressMap(progress: ProgressMap): ProgressMap;

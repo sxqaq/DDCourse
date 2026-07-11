@@ -1,7 +1,7 @@
 "use client";
 
 import { ChangeEvent, DragEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createProgressBackup, parseProgressBackup, progressBackupFilename, type ProgressMap } from "./progress-backup.mjs";
+import { createProgressBackup, normalizeProgressId, normalizeProgressMap, parseProgressBackup, progressBackupFilename, progressId, type ProgressMap } from "./progress-backup.mjs";
 
 type CourseFile = {
   name: string;
@@ -39,7 +39,7 @@ const SPEED_KEY = "lumacourse_speed_v1";
 const SPEEDS: Record<string, number> = { KeyQ: 1, KeyW: 1.25, KeyE: 1.5, KeyR: 2 };
 
 function pathOf(file: CourseFile) { return file.webkitRelativePath || file.name; }
-function idOf(file: CourseFile) { return `${pathOf(file)}::${file.size}::${file.lastModified}`; }
+function idOf(file: CourseFile) { return progressId(pathOf(file), file.size); }
 function cleanName(name: string) { return name.replace(/\.[^.]+$/, "").replace(/^\d+[\s._-]*/, "").replace(/[_-]+/g, " "); }
 function timeLabel(seconds = 0) {
   if (!Number.isFinite(seconds)) return "--:--";
@@ -66,7 +66,8 @@ export default function Home() {
   const [allFiles, setAllFiles] = useState<CourseFile[]>([]);
   const [collectionKey, setCollectionKey] = useState("");
   const [activeId, setActiveId] = useState("");
-  const [progress, setProgress] = useState<ProgressMap>(() => readJson(PROGRESS_KEY, {}));
+  const [progress, setProgress] = useState<ProgressMap>(() => normalizeProgressMap(readJson(PROGRESS_KEY, {})));
+  const progressRef = useRef(progress);
   const [query, setQuery] = useState("");
   const [unfinished, setUnfinished] = useState(false);
   const [collapsed, setCollapsed] = useState(() => typeof window !== "undefined" && localStorage.getItem("lumacourse_sidebar") === "1");
@@ -81,8 +82,8 @@ export default function Home() {
   const [notice, setNotice] = useState("");
   const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(null);
   const [installed, setInstalled] = useState(() => typeof window !== "undefined" && (window.matchMedia("(display-mode: standalone)").matches || navigator.userAgent.includes("Electron")));
-  const [bookmarks, setBookmarks] = useState<StudyBookmark[]>(() => readJson("ddcourse_bookmarks_v1", []));
-  const [notes, setNotes] = useState<StudyNote[]>(() => readJson("ddcourse_notes_v1", []));
+  const [bookmarks, setBookmarks] = useState<StudyBookmark[]>(() => readJson<StudyBookmark[]>("ddcourse_bookmarks_v1", []).map(item => ({ ...item, fileId: normalizeProgressId(item.fileId) })));
+  const [notes, setNotes] = useState<StudyNote[]>(() => readJson<StudyNote[]>("ddcourse_notes_v1", []).map(item => ({ ...item, fileId: normalizeProgressId(item.fileId) })));
   const [isFullscreen, setIsFullscreen] = useState(false);
   const notesReadyRef = useRef(false);
   const audioRef = useRef<{ ctx: AudioContext; node: DynamicsCompressorNode } | null>(null);
@@ -155,14 +156,14 @@ export default function Home() {
     return { done, duration, pct: duration ? Math.min(100, Math.round(watched / duration * 100)) : files.length ? Math.round(done / files.length * 100) : 0 };
   }, [files, progress]);
 
-  const persist = useCallback((next: ProgressMap) => { setProgress(next); localStorage.setItem(PROGRESS_KEY, JSON.stringify(next)); }, []);
+  const persist = useCallback((next: ProgressMap) => { progressRef.current = next; setProgress(next); localStorage.setItem(PROGRESS_KEY, JSON.stringify(next)); }, []);
   const recordCurrent = useCallback((forceDone = false) => {
     const video = videoRef.current; if (!video || !activeFile) return;
     const duration = Number.isFinite(video.duration) ? video.duration : 0;
     const time = video.currentTime || 0;
-    const next = { ...progress, [idOf(activeFile)]: { time, duration, done: forceDone || (duration > 0 && time / duration >= .9), updatedAt: new Date().toISOString(), speed } };
+    const next = { ...progressRef.current, [idOf(activeFile)]: { time, duration, done: forceDone || (duration > 0 && time / duration >= .9), updatedAt: new Date().toISOString(), speed } };
     persist(next);
-  }, [activeFile, progress, speed, persist]);
+  }, [activeFile, speed, persist]);
 
   const playFile = useCallback((file: CourseFile) => {
     recordCurrent();
@@ -210,7 +211,7 @@ export default function Home() {
   useEffect(() => {
     if (!current || activeId) return;
     const last = readJson<{ collection: string; id: string } | null>(LAST_KEY, null);
-    const resume = current.files.find(f => idOf(f) === last?.id && !progress[idOf(f)]?.done) || current.files.find(f => (progress[idOf(f)]?.time || 0) > 0 && !progress[idOf(f)]?.done);
+    const resume = current.files.find(f => idOf(f) === normalizeProgressId(last?.id || "") && !progress[idOf(f)]?.done) || current.files.find(f => (progress[idOf(f)]?.time || 0) > 0 && !progress[idOf(f)]?.done);
     // eslint-disable-next-line react-hooks/set-state-in-effect
     if (resume) setNotice(`可继续播放：${cleanName(resume.name)}`);
   }, [current, activeId, progress]);
@@ -282,7 +283,16 @@ export default function Home() {
     const file = e.target.files?.[0]; if (!file) return;
     try {
       const backup = parseProgressBackup(JSON.parse(await file.text()));
-      persist({ ...progress, ...backup.progress });
+      const next = { ...progressRef.current, ...backup.progress };
+      persist(next);
+      if (activeFile && videoRef.current) {
+        const imported = next[idOf(activeFile)];
+        if (imported) {
+          const video = videoRef.current;
+          if (imported.time >= 0 && (!Number.isFinite(video.duration) || imported.time <= video.duration)) video.currentTime = imported.time;
+          if (imported.speed) { video.playbackRate = imported.speed; setSpeed(imported.speed); }
+        }
+      }
       setNotice(`学习进度已成功导入（${Object.keys(backup.progress).length} 条）`);
     } catch {
       setNotice("这不是有效的 DDCourse 进度文件");

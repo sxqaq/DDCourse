@@ -29,7 +29,7 @@ The entire project—including product design, source code, tests, build and rel
 
 ### Windows EXE installer (recommended)
 
-Download `DDCourse-Setup-1.2.0.exe` from the project Releases page and follow the setup wizard. The installer provides:
+Download `DDCourse-Setup-1.2.1.exe` from the project Releases page and follow the setup wizard. The installer provides:
 
 - A selectable installation directory
 - A desktop shortcut
@@ -44,7 +44,7 @@ npm install
 npm run desktop:build
 ```
 
-The generated installer is saved as `release/DDCourse-Setup-1.2.0.exe`.
+The generated installer is saved as `release/DDCourse-Setup-1.2.1.exe`.
 
 ## Back up and restore learning progress
 
@@ -52,7 +52,7 @@ Progress is stored in the current browser or desktop app's local storage. The ba
 
 - Export: select **Export progress** at the bottom of the course library. DDCourse downloads `DDCourse-progress-YYYY-MM-DD.json`.
 - Import: select **Import progress** and choose a previous backup. Imported records are merged with local records; an imported record replaces the local record for the same video.
-- Compatibility: desktop and Web/PWA editions use the same format. Videos must be selected again on the destination device, with the same path, size, and modification time, so DDCourse can match them.
+- Compatibility: desktop and Web/PWA editions use the same format. Videos must be selected again on the destination device with the same relative path and file size so DDCourse can match them.
 
 The backup uses format version `1`:
 
@@ -62,7 +62,7 @@ The backup uses format version `1`:
   "formatVersion": 1,
   "exportedAt": "2026-07-11T08:30:00.000Z",
   "progress": {
-    "Course/01-Introduction.mp4::104857600::1783758600000": {
+    "Course/01-Introduction.mp4::104857600": {
       "time": 125.4,
       "duration": 1800,
       "done": false,
@@ -74,6 +74,8 @@ The backup uses format version `1`:
 ```
 
 Files from another app, unknown format versions, negative times, and incomplete records are rejected. Legacy DDCourse backups without `formatVersion` remain supported.
+
+See [Learning progress JSON format](./PROGRESS_FORMAT.md) for the complete field reference and manual authoring instructions. Version 1.2.1 automatically migrates legacy video IDs that include modification times.
 
 ### Browser installation
 

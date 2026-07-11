@@ -12,6 +12,26 @@ function isProgressRecord(value) {
     && (value.speed === undefined || (typeof value.speed === "number" && Number.isFinite(value.speed) && value.speed > 0));
 }
 
+export function progressId(path, size) {
+  return `${path}::${size}`;
+}
+
+export function normalizeProgressId(id) {
+  if (typeof id !== "string") return id;
+  const legacy = id.match(/^(.*::\d+)::\d+(?:\.\d+)?$/);
+  return legacy ? legacy[1] : id;
+}
+
+export function normalizeProgressMap(progress) {
+  const normalized = {};
+  for (const [id, record] of Object.entries(progress)) {
+    const nextId = normalizeProgressId(id);
+    const existing = normalized[nextId];
+    if (!existing || Date.parse(record.updatedAt) >= Date.parse(existing.updatedAt)) normalized[nextId] = record;
+  }
+  return normalized;
+}
+
 export function createProgressBackup(progress, now = new Date()) {
   return { app: "DDCourse", formatVersion: 1, exportedAt: now.toISOString(), progress };
 }
@@ -27,7 +47,7 @@ export function parseProgressBackup(value) {
     exportedAt: typeof value.exportedAt === "string" && !Number.isNaN(Date.parse(value.exportedAt))
       ? value.exportedAt
       : new Date(0).toISOString(),
-    progress: value.progress,
+    progress: normalizeProgressMap(value.progress),
   };
 }
 
