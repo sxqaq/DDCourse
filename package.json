@@ -11,9 +11,11 @@
   },
   "scripts": {
     "dev": "vinext dev",
-    "build": "vinext build",
+    "build": "vinext build && node scripts/generate-service-worker.mjs",
     "start": "vinext start",
-    "test": "node --test tests/*.test.mjs",
+    "test": "node --test tests/*.test.mjs && tsx --test tests/*.test.tsx",
+    "test:e2e": "playwright test",
+    "typecheck": "tsc --noEmit --incremental false",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "desktop:bundle": "vite build --config desktop/vite.config.ts",
     "desktop:preview": "npm run desktop:bundle && electron .",
@@ -26,6 +28,7 @@
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "1.37.1",
+    "@playwright/test": "1.61.1",
     "@tailwindcss/postcss": "4.2.1",
     "@types/node": "22.19.19",
     "@types/react": "19.2.14",
@@ -38,9 +41,11 @@
     "eslint-config-next": "16.2.6",
     "react-server-dom-webpack": "19.2.6",
     "tailwindcss": "4.2.1",
+    "tsx": "4.22.1",
     "typescript": "5.9.3",
     "vinext": "0.0.50",
     "vite": "8.0.13",
+    "workbox-build": "7.4.1",
     "wrangler": "4.92.0"
   },
   "build": {

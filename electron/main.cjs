@@ -2,6 +2,8 @@ const { app, BrowserWindow, dialog, ipcMain, shell } = require("electron");
 const fs = require("node:fs");
 const path = require("node:path");
 const { pathToFileURL } = require("node:url");
+const { createSerialQueue } = require("./serial-queue.cjs");
+const notesSchema = import("../app/notes-schema.mjs");
 
 app.setName("DDCourse");
 
@@ -27,6 +29,13 @@ async function writeJsonAtomic(filePath, payload) {
   await fs.promises.writeFile(temporaryPath, data, "utf8");
   await fs.promises.rename(temporaryPath, filePath);
 }
+
+const queueNotesWrite = createSerialQueue(async payload => {
+  const { parseNotesDocument } = await notesSchema;
+  const validated = parseNotesDocument(payload);
+  await writeJsonAtomic(notesPath(), validated);
+  return notesPath();
+});
 
 async function scanFolder(root) {
   const files = [];
@@ -72,21 +81,22 @@ ipcMain.handle("course-folder:restore", async () => {
 });
 
 ipcMain.handle("notes:load", async () => {
-  try { return JSON.parse(await fs.promises.readFile(notesPath(), "utf8")); }
+  try {
+    const raw = JSON.parse(await fs.promises.readFile(notesPath(), "utf8"));
+    const { parseNotesDocument } = await notesSchema;
+    return parseNotesDocument(raw, { allowLegacy: true });
+  }
   catch (error) { if (error?.code !== "ENOENT") console.warn("Unable to load notes", error); return null; }
 });
 
 ipcMain.handle("notes:save-and-show", async (_event, payload) => {
-  const filePath = notesPath();
-  await writeJsonAtomic(filePath, payload);
+  const filePath = await queueNotesWrite(payload);
   shell.showItemInFolder(filePath);
   return filePath;
 });
 
 ipcMain.handle("notes:save", async (_event, payload) => {
-  const filePath = notesPath();
-  await writeJsonAtomic(filePath, payload);
-  return filePath;
+  return await queueNotesWrite(payload);
 });
 
 function createWindow() {

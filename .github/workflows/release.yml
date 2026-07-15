@@ -22,8 +22,14 @@ jobs:
         run: npm ci
       - name: Run tests
         run: npm test
+      - name: Run type and lint checks
+        run: npm run typecheck && npm run lint
       - name: Build web application
         run: npm run build
+      - name: Verify offline startup
+        run: |
+          npx playwright install chromium
+          npm run test:e2e
       - name: Build installer
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
