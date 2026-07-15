@@ -34,6 +34,7 @@ The entire project—including product design, source code, tests, build and rel
 - [Web, PWA, and Electron differences](./docs/DESKTOP_AND_WEB.md)
 - [Fonts and licensing](./docs/FONTS_AND_LICENSING.md)
 - [Progress JSON format](./PROGRESS_FORMAT.md)
+- [Changelog](./CHANGELOG.md)
 
 Detailed documents are currently maintained in Chinese. After a course folder is loaded, the primary action becomes **Refresh** and the secondary action becomes **Change folder**. Electron rescans the remembered directory directly; browsers require the user to authorize the same folder again. Imported progress is merged into the live UI immediately.
 
@@ -41,7 +42,7 @@ Detailed documents are currently maintained in Chinese. After a course folder is
 
 ### Windows EXE installer (recommended)
 
-Download `DDCourse-Setup-1.3.0.exe` from the project Releases page and follow the setup wizard. The installer provides:
+Download `DDCourse-Setup-1.4.0.exe` from the project Releases page and follow the setup wizard. The installer provides:
 
 - A selectable installation directory
 - A desktop shortcut
@@ -56,7 +57,7 @@ npm install
 npm run desktop:build
 ```
 
-The generated installer is saved as `release/DDCourse-Setup-1.3.0.exe`.
+The generated installer is saved as `release/DDCourse-Setup-1.4.0.exe`.
 
 ## Back up and restore learning progress
 

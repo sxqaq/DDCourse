@@ -34,7 +34,7 @@ flowchart TD
   Bridge --> Electron
 ```
 
-`page.tsx` 负责组合状态和渲染界面。播放器、进度、快捷键、周统计、笔记列表及桌面能力分别由 Hook 管理。共享数据结构位于 `types.ts`，存储键和容错读写位于 `storage.ts`。
+`page.tsx` 负责组合状态和跨能力操作。课程库状态位于 `useCourseLibrary`，课程侧栏、播放器舞台和笔记面板分别位于 `CourseSidebar`、`PlayerStage` 与 `NotesPanel`。播放器、进度、快捷键、周统计、笔记列表、桌面笔记同步、PWA 安装及人声增强分别由 Hook 管理。共享数据结构位于 `types.ts`，存储键和容错读写位于 `storage.ts`。
 
 ## 播放与进度
 
@@ -48,7 +48,7 @@ flowchart TD
 
 ## 笔记和收藏
 
-Web/PWA 以 localStorage 为主存储。桌面端以“文档/DDCourse/学习笔记.json”为持久文件，同时保留 localStorage 缓存。启动时两边按照稳定 UUID 合并，兼容没有 UUID 的旧记录；桌面文件采用临时文件写入后替换，并限制单次数据为 5 MiB。
+Web/PWA 以 localStorage 为主存储。桌面端以“文档/DDCourse/学习笔记.json”为持久文件，同时保留 localStorage 缓存。启动时两边按照稳定 UUID 和 `updatedAt` 合并，兼容没有 UUID 或 `updatedAt` 的旧记录；IPC 两端使用运行时 schema，渲染进程对保存进行 debounce，主进程将写入串行化。桌面文件采用临时文件写入后替换，并限制单次数据为 5 MiB。
 
 ## Electron 安全边界
 
@@ -56,10 +56,12 @@ BrowserWindow 启用 `contextIsolation`、禁用 `nodeIntegration` 并启用 san
 
 ## 资源生命周期
 
-本地视频使用 object URL 或桌面 `file:` URL。切换文件和组件卸载时会撤销 object URL。人声增强使用单个 AudioContext 和 DynamicsCompressorNode。下载备份创建的临时 URL 会延迟撤销，避免浏览器尚未读取完成。
+本地视频使用 object URL 或桌面 `file:` URL。统一的停止生命周期会在切换目录、合集、刷新、重置和组件卸载时保存进度、暂停视频、清空媒体源并撤销 object URL。人声增强使用单个 AudioContext 和 DynamicsCompressorNode。下载备份创建的临时 URL 会延迟撤销，避免浏览器尚未读取完成。
+
+PWA 的正式构建使用 Workbox 根据 `dist/client` 的真实产物生成预缓存清单。Cloudflare Worker 提供去除动态 `Vary` 协商头的 `/offline-shell`，Service Worker 将它作为离线导航回退，避免动态首页因请求头不一致而无法命中 Cache API。发布检查会在浏览器中启用 Service Worker、切断网络并重新载入应用，验证离线冷启动。
 
 自定义字体通过 FontFace API 激活，并以 ArrayBuffer 保存在 IndexedDB。字体系列和界面比例通过 CSS 自定义属性应用，避免组件直接维护大量字号分支。
 
 ## 后续边界
 
-`page.tsx` 仍包含课程库、安装提示、人声增强和较大块 JSX。后续可继续拆分 `useCourseLibrary`、`useInstallPrompt`、`useVoiceEnhancer`，以及 `CourseSidebar`、`LearningMap` 和 `PlayerControls`。拆分应以状态和副作用边界为依据，而不是单纯追求行数。
+稳定组件不再为了行数继续拆分；新增能力应按数据所有权或副作用边界进入对应 Hook，避免重新把浏览器、媒体和桌面持久化生命周期堆回组合页。

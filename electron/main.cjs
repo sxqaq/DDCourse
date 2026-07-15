@@ -2,6 +2,8 @@ const { app, BrowserWindow, dialog, ipcMain, shell } = require("electron");
 const fs = require("node:fs");
 const path = require("node:path");
 const { pathToFileURL } = require("node:url");
+const { createSerialQueue } = require("./serial-queue.cjs");
+const notesSchema = import("../app/notes-schema.mjs");
 
 app.setName("DDCourse");
 
@@ -9,6 +11,12 @@ const VIDEO_RE = /\.(mp4|webm|ogg|mov|m4v|mkv|avi)$/i;
 const settingsPath = () => path.join(app.getPath("userData"), "settings.json");
 const notesPath = () => path.join(app.getPath("documents"), "DDCourse", "学习笔记.json");
 const MAX_NOTES_BYTES = 5 * 1024 * 1024;
+const rendererPath = path.join(__dirname, "../desktop-dist/index.html");
+const rendererUrl = pathToFileURL(rendererPath).href;
+
+function assertTrustedSender(event) {
+  if (event.senderFrame?.url !== rendererUrl) throw new Error("Untrusted IPC sender");
+}
 
 function readSettings() {
   try { return JSON.parse(fs.readFileSync(settingsPath(), "utf8")); } catch { return {}; }
@@ -27,6 +35,13 @@ async function writeJsonAtomic(filePath, payload) {
   await fs.promises.writeFile(temporaryPath, data, "utf8");
   await fs.promises.rename(temporaryPath, filePath);
 }
+
+const queueNotesWrite = createSerialQueue(async payload => {
+  const { parseNotesDocument } = await notesSchema;
+  const validated = parseNotesDocument(payload);
+  await writeJsonAtomic(notesPath(), validated);
+  return notesPath();
+});
 
 async function scanFolder(root) {
   const files = [];
@@ -57,36 +72,44 @@ async function scanFolder(root) {
   return { folderName: path.basename(root), folderPath: root, files };
 }
 
-ipcMain.handle("course-folder:choose", async () => {
-  const result = await dialog.showOpenDialog({ properties: ["openDirectory"] });
+ipcMain.handle("course-folder:choose", async event => {
+  assertTrustedSender(event);
+  const parent = BrowserWindow.fromWebContents(event.sender);
+  const options = { properties: ["openDirectory"] };
+  const result = parent ? await dialog.showOpenDialog(parent, options) : await dialog.showOpenDialog(options);
   if (result.canceled || !result.filePaths[0]) return null;
   const folderPath = result.filePaths[0];
   saveSettings({ ...readSettings(), lastFolder: folderPath });
   return await scanFolder(folderPath);
 });
 
-ipcMain.handle("course-folder:restore", async () => {
+ipcMain.handle("course-folder:restore", async event => {
+  assertTrustedSender(event);
   const folderPath = readSettings().lastFolder;
   if (!folderPath || !fs.existsSync(folderPath)) return null;
   return await scanFolder(folderPath);
 });
 
-ipcMain.handle("notes:load", async () => {
-  try { return JSON.parse(await fs.promises.readFile(notesPath(), "utf8")); }
+ipcMain.handle("notes:load", async event => {
+  assertTrustedSender(event);
+  try {
+    const raw = JSON.parse(await fs.promises.readFile(notesPath(), "utf8"));
+    const { parseNotesDocument } = await notesSchema;
+    return parseNotesDocument(raw, { allowLegacy: true });
+  }
   catch (error) { if (error?.code !== "ENOENT") console.warn("Unable to load notes", error); return null; }
 });
 
-ipcMain.handle("notes:save-and-show", async (_event, payload) => {
-  const filePath = notesPath();
-  await writeJsonAtomic(filePath, payload);
+ipcMain.handle("notes:save-and-show", async (event, payload) => {
+  assertTrustedSender(event);
+  const filePath = await queueNotesWrite(payload);
   shell.showItemInFolder(filePath);
   return filePath;
 });
 
-ipcMain.handle("notes:save", async (_event, payload) => {
-  const filePath = notesPath();
-  await writeJsonAtomic(filePath, payload);
-  return filePath;
+ipcMain.handle("notes:save", async (event, payload) => {
+  assertTrustedSender(event);
+  return await queueNotesWrite(payload);
 });
 
 function createWindow() {
@@ -107,15 +130,21 @@ function createWindow() {
       sandbox: true,
     },
   });
-  window.loadFile(path.join(__dirname, "../desktop-dist/index.html"));
+  window.loadFile(rendererPath);
   window.once("ready-to-show", () => window.show());
   window.webContents.setWindowOpenHandler(({ url }) => {
-    if (url.startsWith("https://")) shell.openExternal(url);
+    try { if (new URL(url).protocol === "https:") shell.openExternal(url); } catch { /* Deny malformed URLs. */ }
     return { action: "deny" };
+  });
+  window.webContents.on("will-navigate", (event, url) => {
+    if (url !== rendererUrl) event.preventDefault();
   });
 }
 
 app.whenReady().then(() => {
+  const session = require("electron").session.defaultSession;
+  session.setPermissionCheckHandler(() => false);
+  session.setPermissionRequestHandler((_webContents, _permission, callback) => callback(false));
   createWindow();
   app.on("activate", () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 });

@@ -28,6 +28,25 @@ const worker = {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
 
+    if (url.pathname === "/sw.js") {
+      const asset = await env.ASSETS.fetch(request);
+      const headers = new Headers(asset.headers);
+      headers.set("Content-Type", "application/javascript; charset=utf-8");
+      headers.set("Cache-Control", "no-cache");
+      headers.set("Service-Worker-Allowed", "/");
+      return new Response(asset.body, { status: asset.status, headers });
+    }
+
+    if (url.pathname === "/offline-shell") {
+      const shellUrl = new URL("/", request.url);
+      const shellRequest = new Request(shellUrl, { headers: request.headers });
+      const response = await handler.fetch(shellRequest, env, ctx);
+      const headers = new Headers(response.headers);
+      headers.delete("Vary");
+      headers.set("Cache-Control", "no-cache");
+      return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+    }
+
     if (url.pathname === "/_vinext/image") {
       const allowedWidths = [...DEFAULT_DEVICE_SIZES, ...DEFAULT_IMAGE_SIZES];
       return handleImageOptimization(request, {

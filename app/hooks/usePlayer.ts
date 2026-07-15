@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef } from "react";
-import { STORAGE_KEYS, writeJson } from "../storage";
+import { STORAGE_KEYS, writeJson, writeString } from "../storage";
 import type { CourseFile, ProgressMap, ProgressRecord } from "../types";
 
 type Options = {
@@ -24,15 +24,33 @@ export function usePlayer(options: Options) {
     current.saveProgress(current.idOf(current.activeFile), { time, duration, done: forceDone || (duration > 0 && time / duration >= .9), updatedAt: new Date().toISOString(), speed: current.speed });
   }, []);
 
+  const revokeObjectUrl = useCallback(() => {
+    if (!objectUrlRef.current) return;
+    URL.revokeObjectURL(objectUrlRef.current);
+    objectUrlRef.current = "";
+  }, []);
+
+  const stopCurrentPlayer = useCallback(() => {
+    const video = videoRef.current;
+    if (video) {
+      recordCurrent();
+      video.pause();
+      video.removeAttribute("src");
+      video.load();
+    }
+    revokeObjectUrl();
+    lastSavedTimeRef.current = 0;
+  }, [recordCurrent, revokeObjectUrl]);
+
   const playFile = useCallback((file: CourseFile) => {
-    recordCurrent();
-    if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
-    objectUrlRef.current = file.nativeUrl || URL.createObjectURL(file as unknown as Blob);
+    stopCurrentPlayer();
+    const sourceUrl = file.nativeUrl || URL.createObjectURL(file as unknown as Blob);
+    if (!file.nativeUrl) objectUrlRef.current = sourceUrl;
     const current = latest.current, fileId = current.idOf(file);
     current.setActiveId(fileId);
     writeJson(STORAGE_KEYS.last, { collection: current.collectionKey, id: fileId });
-    requestAnimationFrame(() => { const video = videoRef.current; if (!video) return; video.src = objectUrlRef.current; video.load(); video.play().catch(() => undefined); });
-  }, [recordCurrent]);
+    requestAnimationFrame(() => { const video = videoRef.current; if (!video) return; video.src = sourceUrl; video.load(); video.play().catch(() => undefined); });
+  }, [stopCurrentPlayer]);
 
   const step = useCallback((direction: number) => { const video = videoRef.current; if (video && Number.isFinite(video.duration)) video.currentTime = Math.max(0, Math.min(video.duration, video.currentTime + direction * 10)); }, []);
   const adjacent = useCallback((direction: number) => { const current = latest.current, target = current.files[current.activeIndex + direction]; if (target) playFile(target); }, [playFile]);
@@ -54,7 +72,7 @@ export function usePlayer(options: Options) {
     lastSavedTimeRef.current = video.currentTime;
   }, [recordCurrent]);
 
-  useEffect(() => { const video = videoRef.current; if (video) video.playbackRate = options.speed; localStorage.setItem(STORAGE_KEYS.speed, String(options.speed)); }, [options.speed]);
+  useEffect(() => { const video = videoRef.current; if (video) video.playbackRate = options.speed; writeString(STORAGE_KEYS.speed, String(options.speed)); }, [options.speed]);
   useEffect(() => {
     const save = () => recordCurrent();
     const onVisibilityChange = () => { if (document.visibilityState === "hidden") save(); };
@@ -62,6 +80,6 @@ export function usePlayer(options: Options) {
     document.addEventListener("visibilitychange", onVisibilityChange);
     return () => { window.removeEventListener("pagehide", save); document.removeEventListener("visibilitychange", onVisibilityChange); };
   }, [recordCurrent]);
-  useEffect(() => () => { if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current); }, []);
-  return { videoRef, recordCurrent, savePeriodically, playFile, step, adjacent, togglePlayback, onLoaded };
+  useEffect(() => () => stopCurrentPlayer(), [stopCurrentPlayer]);
+  return { videoRef, recordCurrent, savePeriodically, stopCurrentPlayer, playFile, step, adjacent, togglePlayback, onLoaded };
 }
