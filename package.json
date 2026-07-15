@@ -18,6 +18,7 @@
     "typecheck": "tsc --noEmit --incremental false",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "desktop:bundle": "vite build --config desktop/vite.config.ts",
+    "desktop:smoke": "npm run desktop:bundle && node scripts/desktop-smoke.mjs",
     "desktop:preview": "npm run desktop:bundle && electron .",
     "desktop:build": "npm run desktop:bundle && electron-builder --win nsis"
   },
