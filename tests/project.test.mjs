@@ -10,6 +10,7 @@ test("desktop build is configured as DDCourse", async () => {
   assert.equal(pkg.build.productName, "DDCourse");
   assert.match(pkg.build.artifactName, /^DDCourse-Setup-/);
   assert(pkg.build.files.includes("app/notes-schema.mjs"));
+  assert.match(pkg.scripts["desktop:build"], /--publish never/);
 });
 
 test("desktop persistence and note management are wired", async () => {

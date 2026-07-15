@@ -22,10 +22,8 @@
     "desktop:smoke:packaged": "npm run desktop:verify-package && node scripts/desktop-smoke.mjs release/win-unpacked/DDCourse.exe",
     "desktop:verify-package": "node scripts/verify-desktop-package.mjs",
     "desktop:check": "node --check electron/main.cjs && node --check electron/preload.cjs && node --check electron/serial-queue.cjs",
-    "desktop:verify-package": "node scripts/verify-desktop-package.mjs",
-    "desktop:check": "node --check electron/main.cjs && node --check electron/preload.cjs && node --check electron/serial-queue.cjs",
     "desktop:preview": "npm run desktop:bundle && electron .",
-    "desktop:build": "npm run desktop:bundle && electron-builder --win nsis"
+    "desktop:build": "npm run desktop:bundle && electron-builder --win nsis --publish never"
   },
   "dependencies": {
     "next": "16.2.6",
@@ -64,7 +62,6 @@
     "files": [
       "desktop-dist/**/*",
       "electron/**/*",
-      "app/notes-schema.mjs",
       "app/notes-schema.mjs",
       "public/icons/icon-192.png",
       "public/icons/icon-512.png",
