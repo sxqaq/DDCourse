@@ -7,16 +7,17 @@ import { cleanName, idOf, timeLabel } from "./course-utils";
 import { useAppearance } from "./hooks/useAppearance";
 import { useCourseLibrary } from "./hooks/useCourseLibrary";
 import { useDesktopBridge } from "./hooks/useDesktopBridge";
+import { useDesktopNotesSync } from "./hooks/useDesktopNotesSync";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { useNotesAndBookmarks } from "./hooks/useNotesAndBookmarks";
 import { usePlayer } from "./hooks/usePlayer";
 import { useProgress } from "./hooks/useProgress";
+import { usePwaInstall } from "./hooks/usePwaInstall";
 import { useStudyTime } from "./hooks/useStudyTime";
+import { useVoiceEnhancer } from "./hooks/useVoiceEnhancer";
 import { normalizeProgressId } from "./progress-backup.mjs";
 import { readJson, STORAGE_KEYS } from "./storage";
 import type { DesktopFolder, StudyBookmark, StudyNote } from "./types";
-
-type InstallPromptEvent = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: "accepted" | "dismissed" }> };
 
 export default function Home() {
   const folderRef = useRef<HTMLInputElement>(null), filesRef = useRef<HTMLInputElement>(null), importRef = useRef<HTMLInputElement>(null);
@@ -25,12 +26,8 @@ export default function Home() {
   const [unfinished, setUnfinished] = useState(false);
   const [collapsed, setCollapsed] = useState(() => typeof window !== "undefined" && localStorage.getItem("lumacourse_sidebar") === "1");
   const [speed, setSpeed] = useState(() => typeof window === "undefined" ? 1 : Number(localStorage.getItem(STORAGE_KEYS.speed)) || 1);
-  const [compressor, setCompressor] = useState(false), [dragging, setDragging] = useState(false), [notice, setNotice] = useState("");
-  const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(null);
-  const [installed, setInstalled] = useState(() => typeof window !== "undefined" && (window.matchMedia("(display-mode: standalone)").matches || navigator.userAgent.includes("Electron")));
+  const [dragging, setDragging] = useState(false), [notice, setNotice] = useState("");
   const [isFullscreen, setIsFullscreen] = useState(false), [appearanceOpen, setAppearanceOpen] = useState(false);
-  const notesReadyRef = useRef(false);
-  const audioRef = useRef<{ ctx: AudioContext; node: DynamicsCompressorNode } | null>(null);
 
   const library = useCourseLibrary(setNotice);
   const { loadDesktopFolder, setCollectionKey, collections, folderName } = library;
@@ -42,33 +39,19 @@ export default function Home() {
   const current = library.current, files = library.files;
   const activeIndex = files.findIndex(file => idOf(file) === activeId), activeFile = activeIndex >= 0 ? files[activeIndex] : null;
   const { videoRef, recordCurrent, savePeriodically, stopCurrentPlayer, playFile, step, adjacent, togglePlayback, onLoaded } = usePlayer({ files, activeFile, activeIndex, collectionKey: current?.key, speed, setSpeed, progress, idOf, setActiveId, saveProgress });
+  const { installed, installApp } = usePwaInstall(setNotice);
+  const { enabled: compressor, toggle: toggleCompressor } = useVoiceEnhancer(videoRef, setNotice);
   useKeyboardShortcuts({ enabled: Boolean(activeFile), togglePlayback, step, adjacent, setSpeed });
+  useDesktopNotesSync({ isDesktop, folderName, notes, bookmarks, deletions, loadNotes, saveNotes, mergeDesktopData, onNotice: setNotice });
 
   const stopAndClearActive = useCallback(() => { stopCurrentPlayer(); setActiveId(""); }, [stopCurrentPlayer]);
   const loadDesktopResult = useCallback((result: DesktopFolder, message?: string) => {
     stopAndClearActive();
     if (loadDesktopFolder(result)) { setNotice(message || `已恢复课程文件夹：${result.folderName}`); window.setTimeout(() => setNotice(""), 2400); }
   }, [loadDesktopFolder, stopAndClearActive]);
-  const mergeDesktopDataRef = useRef(mergeDesktopData); mergeDesktopDataRef.current = mergeDesktopData;
-
-  useEffect(() => {
-    if (!isDesktop) { notesReadyRef.current = true; return; }
-    loadNotes().then(value => { if (value) mergeDesktopDataRef.current(value); notesReadyRef.current = true; }).catch(error => { console.error(error); setNotice("桌面笔记读取失败，本地缓存仍可使用"); notesReadyRef.current = true; });
-  }, [isDesktop, loadNotes]);
-  useEffect(() => {
-    if (!notesReadyRef.current || !isDesktop) return;
-    const timer = window.setTimeout(() => saveNotes({ app: "DDCourse", updatedAt: new Date().toISOString(), folder: folderName, notes, bookmarks, deletions }).catch(error => { console.error(error); setNotice("桌面笔记保存失败，请检查磁盘空间和目录权限"); }), 400);
-    return () => window.clearTimeout(timer);
-  }, [notes, bookmarks, deletions, folderName, isDesktop, saveNotes]);
   useEffect(() => { if (isDesktop) restoreFolder().then(result => { if (result?.files.length) loadDesktopResult(result); }).catch(() => undefined); }, [isDesktop, restoreFolder, loadDesktopResult]);
   useEffect(() => { let reported = false; const report = () => { if (!reported) { reported = true; setNotice("本地存储空间不足或不可用，本次更改可能没有保存"); } }; window.addEventListener("ddcourse:storage-error", report); return () => window.removeEventListener("ddcourse:storage-error", report); }, []);
   useEffect(() => { const sync = () => setIsFullscreen(Boolean(document.fullscreenElement)); document.addEventListener("fullscreenchange", sync); return () => document.removeEventListener("fullscreenchange", sync); }, []);
-  useEffect(() => {
-    if (process.env.NODE_ENV === "production" && window.location.protocol !== "file:" && "serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => undefined);
-    const capture = (event: Event) => { event.preventDefault(); setInstallPrompt(event as InstallPromptEvent); }, complete = () => { setInstalled(true); setInstallPrompt(null); setNotice("DDCourse 已安装完成"); };
-    window.addEventListener("beforeinstallprompt", capture); window.addEventListener("appinstalled", complete);
-    return () => { window.removeEventListener("beforeinstallprompt", capture); window.removeEventListener("appinstalled", complete); };
-  }, []);
   useEffect(() => {
     if (!collections.length || activeId) return;
     const last = readJson<{ collection: string; id: string } | null>(STORAGE_KEYS.last, null); if (!last) return;
@@ -92,7 +75,6 @@ export default function Home() {
     return { done, duration, pct: duration ? Math.min(100, Math.round(watched / duration * 100)) : files.length ? Math.round(done / files.length * 100) : 0 };
   }, [files, progress]);
 
-  const installApp = async () => { if (!installPrompt) { setNotice("请使用 Chrome 或 Edge 的“安装此应用”功能"); return; } await installPrompt.prompt(); const choice = await installPrompt.userChoice; if (choice.outcome === "accepted") setInstalled(true); setInstallPrompt(null); };
   const pickFolder = async () => { if (isDesktop) { const result = await chooseFolder(); if (result?.files.length) loadDesktopResult(result, `已载入 ${result.files.length} 个视频`); else if (result) setNotice("这个文件夹里没有可播放的视频"); return; } folderRef.current?.click(); };
   const refreshFolder = async () => {
     if (!library.folderMode) return pickFolder();
@@ -117,11 +99,6 @@ export default function Home() {
     const payload = { app: "DDCourse", updatedAt: new Date().toISOString(), folder: library.folderName, notes, bookmarks, deletions };
     if (isDesktop) { try { setNotice(`笔记已保存：${await saveAndShowNotes(payload)}`); } catch { setNotice("笔记保存失败，请检查磁盘空间和目录权限"); } return; }
     const anchor = document.createElement("a"); anchor.href = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" })); anchor.download = "DDCourse-学习笔记.json"; anchor.click(); window.setTimeout(() => URL.revokeObjectURL(anchor.href), 1000);
-  };
-  const toggleCompressor = () => {
-    const video = videoRef.current; if (!video) return;
-    try { if (!audioRef.current) { const Ctx = window.AudioContext || (window as typeof window & { webkitAudioContext: typeof AudioContext }).webkitAudioContext; const ctx = new Ctx(), source = ctx.createMediaElementSource(video), node = ctx.createDynamicsCompressor(); node.threshold.value = -26; node.knee.value = 18; node.ratio.value = 5; node.attack.value = .01; node.release.value = .22; source.connect(node); node.connect(ctx.destination); audioRef.current = { ctx, node }; } audioRef.current.ctx.resume(); setCompressor(value => !value); audioRef.current.node.threshold.value = compressor ? 0 : -26; }
-    catch { setNotice("当前浏览器无法启用人声增强"); }
   };
   const toggleFullscreen = async () => { if (document.fullscreenElement) await document.exitFullscreen(); else await document.documentElement.requestFullscreen(); };
   const onDrop = (event: DragEvent) => { event.preventDefault(); setDragging(false); if (event.dataTransfer.files.length) loadBrowserFiles(event.dataTransfer.files, false); };
