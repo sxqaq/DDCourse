@@ -36,7 +36,7 @@ export default function Home() {
   const { loadDesktopFolder, setCollectionKey, collections, folderName } = library;
   const { progress, saveProgress, resetFiles, importProgress: importProgressFile, exportProgress: createProgressExport } = useProgress();
   const { weekSeconds, trackVideoTime } = useStudyTime();
-  const { notes, bookmarks, mergeDesktopData, addNote: storeNote, editNote: updateNote, deleteNote: removeNote, addBookmark: storeBookmark, editBookmark: updateBookmark, deleteBookmark: removeBookmark } = useNotesAndBookmarks();
+  const { notes, bookmarks, deletions, mergeDesktopData, addNote: storeNote, editNote: updateNote, deleteNote: removeNote, addBookmark: storeBookmark, editBookmark: updateBookmark, deleteBookmark: removeBookmark } = useNotesAndBookmarks();
   const { font, setFont, scale, setScale, fontName, importFont } = useAppearance();
   const { isDesktop, restoreFolder, loadNotes, saveNotes, saveAndShowNotes, chooseFolder } = useDesktopBridge();
   const current = library.current, files = library.files;
@@ -57,9 +57,9 @@ export default function Home() {
   }, [isDesktop, loadNotes]);
   useEffect(() => {
     if (!notesReadyRef.current || !isDesktop) return;
-    const timer = window.setTimeout(() => saveNotes({ app: "DDCourse", updatedAt: new Date().toISOString(), folder: folderName, notes, bookmarks }).catch(error => { console.error(error); setNotice("桌面笔记保存失败，请检查磁盘空间和目录权限"); }), 400);
+    const timer = window.setTimeout(() => saveNotes({ app: "DDCourse", updatedAt: new Date().toISOString(), folder: folderName, notes, bookmarks, deletions }).catch(error => { console.error(error); setNotice("桌面笔记保存失败，请检查磁盘空间和目录权限"); }), 400);
     return () => window.clearTimeout(timer);
-  }, [notes, bookmarks, folderName, isDesktop, saveNotes]);
+  }, [notes, bookmarks, deletions, folderName, isDesktop, saveNotes]);
   useEffect(() => { if (isDesktop) restoreFolder().then(result => { if (result?.files.length) loadDesktopResult(result); }).catch(() => undefined); }, [isDesktop, restoreFolder, loadDesktopResult]);
   useEffect(() => { let reported = false; const report = () => { if (!reported) { reported = true; setNotice("本地存储空间不足或不可用，本次更改可能没有保存"); } }; window.addEventListener("ddcourse:storage-error", report); return () => window.removeEventListener("ddcourse:storage-error", report); }, []);
   useEffect(() => { const sync = () => setIsFullscreen(Boolean(document.fullscreenElement)); document.addEventListener("fullscreenchange", sync); return () => document.removeEventListener("fullscreenchange", sync); }, []);
@@ -114,7 +114,7 @@ export default function Home() {
   const deleteNote = (item: StudyNote) => { if (confirm(`删除 ${timeLabel(item.time)} 的这条笔记？`)) removeNote(item.id); };
   const addNote = () => { const text = prompt("记录这一刻的想法："); if (!text?.trim() || !activeFile) return; const time = videoRef.current?.currentTime || 0; storeNote({ fileId: idOf(activeFile), fileName: cleanName(activeFile.name), time, text: text.trim() }); setNotice("笔记已添加到学习地图"); };
   const showNotesLocation = async () => {
-    const payload = { app: "DDCourse", updatedAt: new Date().toISOString(), folder: library.folderName, notes, bookmarks };
+    const payload = { app: "DDCourse", updatedAt: new Date().toISOString(), folder: library.folderName, notes, bookmarks, deletions };
     if (isDesktop) { try { setNotice(`笔记已保存：${await saveAndShowNotes(payload)}`); } catch { setNotice("笔记保存失败，请检查磁盘空间和目录权限"); } return; }
     const anchor = document.createElement("a"); anchor.href = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" })); anchor.download = "DDCourse-学习笔记.json"; anchor.click(); window.setTimeout(() => URL.revokeObjectURL(anchor.href), 1000);
   };

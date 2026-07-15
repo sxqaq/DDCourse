@@ -43,15 +43,14 @@ export function usePlayer(options: Options) {
   }, [recordCurrent, revokeObjectUrl]);
 
   const playFile = useCallback((file: CourseFile) => {
-    recordCurrent();
-    revokeObjectUrl();
+    stopCurrentPlayer();
     const sourceUrl = file.nativeUrl || URL.createObjectURL(file as unknown as Blob);
     if (!file.nativeUrl) objectUrlRef.current = sourceUrl;
     const current = latest.current, fileId = current.idOf(file);
     current.setActiveId(fileId);
     writeJson(STORAGE_KEYS.last, { collection: current.collectionKey, id: fileId });
     requestAnimationFrame(() => { const video = videoRef.current; if (!video) return; video.src = sourceUrl; video.load(); video.play().catch(() => undefined); });
-  }, [recordCurrent, revokeObjectUrl]);
+  }, [stopCurrentPlayer]);
 
   const step = useCallback((direction: number) => { const video = videoRef.current; if (video && Number.isFinite(video.duration)) video.currentTime = Math.max(0, Math.min(video.duration, video.currentTime + direction * 10)); }, []);
   const adjacent = useCallback((direction: number) => { const current = latest.current, target = current.files[current.activeIndex + direction]; if (target) playFile(target); }, [playFile]);

@@ -41,12 +41,25 @@ function parseStudyItem(value, kind, allowLegacy) {
   };
 }
 
+function parseDeletion(value) {
+  if (!isObject(value)
+    || typeof value.id !== "string"
+    || !value.id.trim()
+    || (value.kind !== "note" && value.kind !== "bookmark")
+    || !isIsoDate(value.deletedAt)) {
+    throw new Error("Invalid study deletion");
+  }
+  return { id: value.id, kind: value.kind, deletedAt: value.deletedAt };
+}
+
 export function parseNotesDocument(value, options = {}) {
   const allowLegacy = options.allowLegacy === true;
   if (!isObject(value)
     || value.app !== "DDCourse"
     || !Array.isArray(value.notes)
     || !Array.isArray(value.bookmarks)
+    || (!allowLegacy && !Array.isArray(value.deletions))
+    || (value.deletions !== undefined && !Array.isArray(value.deletions))
     || (value.folder !== undefined && typeof value.folder !== "string")) {
     throw new Error("Invalid notes document");
   }
@@ -64,6 +77,7 @@ export function parseNotesDocument(value, options = {}) {
     folder: value.folder || "",
     notes: value.notes.map(item => parseStudyItem(item, "note", allowLegacy)),
     bookmarks: value.bookmarks.map(item => parseStudyItem(item, "bookmark", allowLegacy)),
+    deletions: (value.deletions || []).map(parseDeletion),
   };
 }
 
@@ -77,6 +91,16 @@ export function normalizeStudyItems(value, kind, createId) {
     } catch {
       // Corrupt individual entries are ignored so one bad record cannot hide all notes.
     }
+  }
+  return normalized;
+}
+
+export function normalizeStudyDeletions(value) {
+  if (!Array.isArray(value)) return [];
+  const normalized = [];
+  for (const item of value) {
+    try { normalized.push(parseDeletion(item)); }
+    catch { /* Ignore corrupt tombstones without hiding valid deletions. */ }
   }
   return normalized;
 }

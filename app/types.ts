@@ -10,6 +10,7 @@ export type CourseFile = {
 export type DesktopFolder = { folderName: string; folderPath: string; files: CourseFile[] };
 export type StudyNote = { id: string; fileId: string; fileName: string; time: number; text: string; createdAt: string; updatedAt: string };
 export type StudyBookmark = { id: string; fileId: string; fileName: string; time: number; label: string; createdAt: string; updatedAt: string };
+export type StudyDeletion = { id: string; kind: "note" | "bookmark"; deletedAt: string };
 export type Collection = { key: string; name: string; files: CourseFile[] };
 export type ProgressRecord = { time: number; duration: number; done: boolean; updatedAt: string; speed?: number };
 export type ProgressMap = Record<string, ProgressRecord>;

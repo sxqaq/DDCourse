@@ -5,6 +5,7 @@ export const STORAGE_KEYS = {
   speed: "lumacourse_speed_v1",
   bookmarks: "ddcourse_bookmarks_v1",
   notes: "ddcourse_notes_v1",
+  noteDeletions: "ddcourse_note_deletions_v1",
 } as const;
 
 export function readJson<T>(key: string, fallback: T): T {
