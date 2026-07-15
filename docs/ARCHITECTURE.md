@@ -58,7 +58,7 @@ BrowserWindow 启用 `contextIsolation`、禁用 `nodeIntegration` 并启用 san
 
 本地视频使用 object URL 或桌面 `file:` URL。统一的停止生命周期会在切换目录、合集、刷新、重置和组件卸载时保存进度、暂停视频、清空媒体源并撤销 object URL。人声增强使用单个 AudioContext 和 DynamicsCompressorNode。下载备份创建的临时 URL 会延迟撤销，避免浏览器尚未读取完成。
 
-PWA 的正式构建使用 Workbox 根据 `dist/client` 的真实产物生成预缓存清单，并把应用入口加入离线导航回退。发布检查会在浏览器中启用 Service Worker、切断网络并重新载入应用，验证离线冷启动。
+PWA 的正式构建使用 Workbox 根据 `dist/client` 的真实产物生成预缓存清单。Cloudflare Worker 提供去除动态 `Vary` 协商头的 `/offline-shell`，Service Worker 将它作为离线导航回退，避免动态首页因请求头不一致而无法命中 Cache API。发布检查会在浏览器中启用 Service Worker、切断网络并重新载入应用，验证离线冷启动。
 
 自定义字体通过 FontFace API 激活，并以 ArrayBuffer 保存在 IndexedDB。字体系列和界面比例通过 CSS 自定义属性应用，避免组件直接维护大量字号分支。
 

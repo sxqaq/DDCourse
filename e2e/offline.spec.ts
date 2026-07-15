@@ -29,9 +29,22 @@ test("the installed application starts while fully offline", async ({ page, cont
   await page.reload();
   await expect.poll(() => page.evaluate(() => Boolean(navigator.serviceWorker.controller))).toBe(true);
 
-  await context.setOffline(true);
-  await page.reload({ waitUntil: "domcontentloaded" });
-  await expect(page.getByRole("heading", { name: /把本地课程/ })).toBeVisible();
-  await expect(page.getByRole("button", { name: "选择课程文件夹" })).toBeVisible();
-  await context.setOffline(false);
+  const cacheState = await page.evaluate(async () => {
+    const names = await caches.keys();
+    const entries = await Promise.all(names.map(async name => ({
+      name,
+      urls: (await (await caches.open(name)).keys()).map(request => request.url),
+    })));
+    return entries;
+  });
+  expect(cacheState.some(cache => cache.urls.some(url => new URL(url).pathname === "/offline-shell"))).toBe(true);
+
+  try {
+    await context.setOffline(true);
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await expect(page.getByRole("heading", { name: /把本地课程/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: "选择课程文件夹" })).toBeVisible();
+  } finally {
+    await context.setOffline(false);
+  }
 });
