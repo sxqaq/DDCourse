@@ -9,6 +9,7 @@ test("desktop build is configured as DDCourse", async () => {
   assert.equal(pkg.name, "ddcourse");
   assert.equal(pkg.build.productName, "DDCourse");
   assert.match(pkg.build.artifactName, /^DDCourse-Setup-/);
+  assert(pkg.build.files.includes("app/notes-schema.mjs"));
 });
 
 test("desktop persistence and note management are wired", async () => {
@@ -83,4 +84,17 @@ test("desktop course scanning is asynchronous and skips symbolic links", async (
   assert.match(main, /fs\.promises\.stat/);
   assert.match(main, /isSymbolicLink\(\)/);
   assert.doesNotMatch(main, /readdirSync|statSync/);
+});
+
+test("corrupt stored progress is ignored instead of crashing startup", () => {
+  assert.deepEqual(normalizeProgressMap(null), {});
+  assert.deepEqual(normalizeProgressMap({ broken: { time: -1 } }), {});
+});
+
+test("desktop IPC and navigation are restricted to the bundled renderer", async () => {
+  const main = await readFile(new URL("../electron/main.cjs", import.meta.url), "utf8");
+  assert.match(main, /assertTrustedSender/);
+  assert.match(main, /senderFrame\?\.url !== rendererUrl/);
+  assert.match(main, /will-navigate/);
+  assert.match(main, /setPermissionRequestHandler/);
 });

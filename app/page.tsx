@@ -16,7 +16,7 @@ import { usePwaInstall } from "./hooks/usePwaInstall";
 import { useStudyTime } from "./hooks/useStudyTime";
 import { useVoiceEnhancer } from "./hooks/useVoiceEnhancer";
 import { normalizeProgressId } from "./progress-backup.mjs";
-import { readJson, STORAGE_KEYS } from "./storage";
+import { readJson, readString, STORAGE_KEYS, writeString } from "./storage";
 import type { DesktopFolder, StudyBookmark, StudyNote } from "./types";
 
 export default function Home() {
@@ -24,8 +24,8 @@ export default function Home() {
   const [activeId, setActiveId] = useState("");
   const [query, setQuery] = useState("");
   const [unfinished, setUnfinished] = useState(false);
-  const [collapsed, setCollapsed] = useState(() => typeof window !== "undefined" && localStorage.getItem("lumacourse_sidebar") === "1");
-  const [speed, setSpeed] = useState(() => typeof window === "undefined" ? 1 : Number(localStorage.getItem(STORAGE_KEYS.speed)) || 1);
+  const [collapsed, setCollapsed] = useState(() => readString("lumacourse_sidebar") === "1");
+  const [speed, setSpeed] = useState(() => { const value = Number(readString(STORAGE_KEYS.speed, "1")); return value >= 0.5 && value <= 3 ? value : 1; });
   const [dragging, setDragging] = useState(false), [notice, setNotice] = useState("");
   const [isFullscreen, setIsFullscreen] = useState(false), [appearanceOpen, setAppearanceOpen] = useState(false);
 
@@ -102,7 +102,7 @@ export default function Home() {
   };
   const toggleFullscreen = async () => { if (document.fullscreenElement) await document.exitFullscreen(); else await document.documentElement.requestFullscreen(); };
   const onDrop = (event: DragEvent) => { event.preventDefault(); setDragging(false); if (event.dataTransfer.files.length) loadBrowserFiles(event.dataTransfer.files, false); };
-  const changeCollapsed = (value: boolean) => { setCollapsed(value); try { localStorage.setItem("lumacourse_sidebar", value ? "1" : "0"); } catch { /* Preference remains in memory. */ } };
+  const changeCollapsed = (value: boolean) => { setCollapsed(value); writeString("lumacourse_sidebar", value ? "1" : "0"); };
 
   return <main className={`shell ${collapsed ? "is-collapsed" : ""}`} onDragOver={event => { event.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={onDrop}>
     {dragging && <div className="dropzone"><div><span>＋</span><strong>松开以载入课程视频</strong><small>实际播放能力取决于视频编码和系统支持</small></div></div>}

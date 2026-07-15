@@ -19,7 +19,11 @@
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "desktop:bundle": "vite build --config desktop/vite.config.ts",
     "desktop:smoke": "npm run desktop:bundle && node scripts/desktop-smoke.mjs",
-    "desktop:smoke:packaged": "node scripts/desktop-smoke.mjs release/win-unpacked/DDCourse.exe",
+    "desktop:smoke:packaged": "npm run desktop:verify-package && node scripts/desktop-smoke.mjs release/win-unpacked/DDCourse.exe",
+    "desktop:verify-package": "node scripts/verify-desktop-package.mjs",
+    "desktop:check": "node --check electron/main.cjs && node --check electron/preload.cjs && node --check electron/serial-queue.cjs",
+    "desktop:verify-package": "node scripts/verify-desktop-package.mjs",
+    "desktop:check": "node --check electron/main.cjs && node --check electron/preload.cjs && node --check electron/serial-queue.cjs",
     "desktop:preview": "npm run desktop:bundle && electron .",
     "desktop:build": "npm run desktop:bundle && electron-builder --win nsis"
   },
@@ -60,6 +64,8 @@
     "files": [
       "desktop-dist/**/*",
       "electron/**/*",
+      "app/notes-schema.mjs",
+      "app/notes-schema.mjs",
       "public/icons/icon-192.png",
       "public/icons/icon-512.png",
       "package.json"

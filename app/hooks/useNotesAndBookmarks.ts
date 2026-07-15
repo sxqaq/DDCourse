@@ -12,6 +12,7 @@ const normalizeNotes = (value: unknown): StudyNote[] => (normalizeStudyItems(val
   .map(item => ({ ...item, fileId: normalizeProgressId(item.fileId) }));
 const normalizeBookmarks = (value: unknown): StudyBookmark[] => (normalizeStudyItems(value, "bookmark", id) as StudyBookmark[])
   .map(item => ({ ...item, fileId: normalizeProgressId(item.fileId) }));
+const isNewerOrEqual = (left: string, right: string) => Date.parse(left) >= Date.parse(right);
 
 export function useNotesAndBookmarks() {
   const notesStore = useLocalStorageList<StudyNote>(STORAGE_KEYS.notes, normalizeNotes);
@@ -30,18 +31,18 @@ export function useNotesAndBookmarks() {
     const payload = value as { notes?: unknown; bookmarks?: unknown; deletions?: unknown };
     const merge = <T extends { id: string; createdAt: string; updatedAt: string }>(local: T[], incoming: T[]) => {
       const byId = new Map(local.map(item => [item.id, item]));
-      incoming.forEach(item => { const existing = byId.get(item.id); if (!existing || item.updatedAt >= existing.updatedAt) byId.set(item.id, item); });
+      incoming.forEach(item => { const existing = byId.get(item.id); if (!existing || isNewerOrEqual(item.updatedAt, existing.updatedAt)) byId.set(item.id, item); });
       return [...byId.values()];
     };
     const deletionMap = new Map<string, StudyDeletion>();
     [...deletionsStore.items, ...normalizeStudyDeletions(payload.deletions)].forEach(deletion => {
       const key = `${deletion.kind}:${deletion.id}`;
       const existing = deletionMap.get(key);
-      if (!existing || deletion.deletedAt >= existing.deletedAt) deletionMap.set(key, deletion);
+      if (!existing || isNewerOrEqual(deletion.deletedAt, existing.deletedAt)) deletionMap.set(key, deletion);
     });
     const keep = (kind: StudyDeletion["kind"]) => <T extends { id: string; updatedAt: string }>(item: T) => {
       const deletion = deletionMap.get(`${kind}:${item.id}`);
-      return !deletion || deletion.deletedAt < item.updatedAt;
+      return !deletion || Date.parse(deletion.deletedAt) < Date.parse(item.updatedAt);
     };
     notesStore.replaceAll(merge(notesStore.items, normalizeNotes(payload.notes)).filter(keep("note")));
     bookmarksStore.replaceAll(merge(bookmarksStore.items, normalizeBookmarks(payload.bookmarks)).filter(keep("bookmark")));

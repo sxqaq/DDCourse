@@ -14,10 +14,22 @@ export function readJson<T>(key: string, fallback: T): T {
 }
 
 export function writeJson(key: string, value: unknown): boolean {
+  if (typeof window === "undefined") return false;
   try { localStorage.setItem(key, JSON.stringify(value)); return true; }
   catch (error) {
     console.error(`Unable to persist local data: ${key}`, error);
     window.dispatchEvent(new CustomEvent("ddcourse:storage-error", { detail: { key } }));
     return false;
   }
+}
+
+export function readString(key: string, fallback = ""): string {
+  if (typeof window === "undefined") return fallback;
+  try { return localStorage.getItem(key) ?? fallback; } catch { return fallback; }
+}
+
+export function writeString(key: string, value: string): boolean {
+  if (typeof window === "undefined") return false;
+  try { localStorage.setItem(key, value); return true; }
+  catch { return false; }
 }

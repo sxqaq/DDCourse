@@ -16,6 +16,7 @@ export function useProgress() {
     persist(next);
   }, [persist]);
   const importProgress = useCallback(async (file: File) => {
+    if (file.size > 5 * 1024 * 1024) throw new Error("Progress backup is too large");
     const backup = parseProgressBackup(JSON.parse(await file.text()));
     const next: ProgressMap = { ...progressRef.current, ...backup.progress };
     persist(next);

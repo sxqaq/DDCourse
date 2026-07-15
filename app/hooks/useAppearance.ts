@@ -75,6 +75,7 @@ export function useAppearance() {
   const importFont = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
+    if (file.size > 20 * 1024 * 1024) throw new Error("Custom font is too large");
     const buffer = await file.arrayBuffer();
     await activateCustomFont(buffer);
     await storeFont(buffer);

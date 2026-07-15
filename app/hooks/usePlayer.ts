@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef } from "react";
-import { STORAGE_KEYS, writeJson } from "../storage";
+import { STORAGE_KEYS, writeJson, writeString } from "../storage";
 import type { CourseFile, ProgressMap, ProgressRecord } from "../types";
 
 type Options = {
@@ -72,7 +72,7 @@ export function usePlayer(options: Options) {
     lastSavedTimeRef.current = video.currentTime;
   }, [recordCurrent]);
 
-  useEffect(() => { const video = videoRef.current; if (video) video.playbackRate = options.speed; localStorage.setItem(STORAGE_KEYS.speed, String(options.speed)); }, [options.speed]);
+  useEffect(() => { const video = videoRef.current; if (video) video.playbackRate = options.speed; writeString(STORAGE_KEYS.speed, String(options.speed)); }, [options.speed]);
   useEffect(() => {
     const save = () => recordCurrent();
     const onVisibilityChange = () => { if (document.visibilityState === "hidden") save(); };

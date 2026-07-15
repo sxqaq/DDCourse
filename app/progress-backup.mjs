@@ -9,7 +9,7 @@ function isProgressRecord(value) {
     && typeof value.done === "boolean"
     && typeof value.updatedAt === "string"
     && !Number.isNaN(Date.parse(value.updatedAt))
-    && (value.speed === undefined || (typeof value.speed === "number" && Number.isFinite(value.speed) && value.speed > 0));
+    && (value.speed === undefined || (typeof value.speed === "number" && Number.isFinite(value.speed) && value.speed >= 0.5 && value.speed <= 3));
 }
 
 export function progressId(path, size) {
@@ -24,7 +24,9 @@ export function normalizeProgressId(id) {
 
 export function normalizeProgressMap(progress) {
   const normalized = {};
+  if (!progress || typeof progress !== "object" || Array.isArray(progress)) return normalized;
   for (const [id, record] of Object.entries(progress)) {
+    if (!isProgressRecord(record)) continue;
     const nextId = normalizeProgressId(id);
     const existing = normalized[nextId];
     if (!existing || Date.parse(record.updatedAt) >= Date.parse(existing.updatedAt)) normalized[nextId] = record;

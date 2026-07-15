@@ -29,6 +29,8 @@ test("desktop note schema validates deletion tombstones", () => {
 test("desktop note schema rejects malformed and unsafe payloads", () => {
   assert.throws(() => parseNotesDocument({ app: "Other", notes: [], bookmarks: [] }));
   assert.throws(() => parseNotesDocument({ app: "DDCourse", updatedAt: createdAt, notes: [{ time: -1 }], bookmarks: [] }));
+  assert.throws(() => parseNotesDocument({ app: "DDCourse", updatedAt: createdAt, notes: [], bookmarks: [], folder: "x".repeat(4097), deletions: [] }));
+  assert.throws(() => parseNotesDocument({ app: "DDCourse", updatedAt: createdAt, notes: Array(10_001).fill({}), bookmarks: [], deletions: [] }));
 });
 
 test("a corrupt local item does not hide valid notes", () => {
