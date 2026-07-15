@@ -41,7 +41,7 @@ Detailed documents are currently maintained in Chinese. After a course folder is
 
 ### Windows EXE installer (recommended)
 
-Download `DDCourse-Setup-1.3.0.exe` from the project Releases page and follow the setup wizard. The installer provides:
+Download `DDCourse-Setup-1.4.0.exe` from the project Releases page and follow the setup wizard. The installer provides:
 
 - A selectable installation directory
 - A desktop shortcut
@@ -56,7 +56,7 @@ npm install
 npm run desktop:build
 ```
 
-The generated installer is saved as `release/DDCourse-Setup-1.3.0.exe`.
+The generated installer is saved as `release/DDCourse-Setup-1.4.0.exe`.
 
 ## Back up and restore learning progress
 

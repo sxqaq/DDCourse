@@ -1,6 +1,6 @@
 {
   "name": "ddcourse",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "一个轻量、私密、会记住学习进度的本地课程视频播放器。",
   "author": "DDCourse Contributors",
   "license": "AGPL-3.0",
@@ -19,6 +19,7 @@
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "desktop:bundle": "vite build --config desktop/vite.config.ts",
     "desktop:smoke": "npm run desktop:bundle && node scripts/desktop-smoke.mjs",
+    "desktop:smoke:packaged": "node scripts/desktop-smoke.mjs release/win-unpacked/DDCourse.exe",
     "desktop:preview": "npm run desktop:bundle && electron .",
     "desktop:build": "npm run desktop:bundle && electron-builder --win nsis"
   },

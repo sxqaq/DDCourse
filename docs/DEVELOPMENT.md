@@ -14,6 +14,7 @@ npm run build
 npm run test:e2e
 npm run desktop:smoke
 npm run desktop:build
+npm run desktop:smoke:packaged
 ```
 
 ## 目录
