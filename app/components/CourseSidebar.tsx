@@ -4,6 +4,7 @@
 import type { ChangeEvent, RefObject } from "react";
 import { cleanName, idOf, timeLabel } from "../course-utils";
 import type { Collection, CourseFile, ProgressMap } from "../types";
+import { CollectionPicker } from "./CollectionPicker";
 
 type CourseStats = { done: number; duration: number; pct: number };
 
@@ -49,7 +50,7 @@ export function CourseSidebar(props: Props) {
         {props.folderName && <div className="folder-name"><span>▱</span><b>{props.folderName}</b><small>{props.allFilesCount} 个视频</small></div>}
       </section>
 
-      {props.collections.length > 1 && <section className="collections"><div className="section-label"><span>课程合集</span><em>{props.collections.length}</em></div><div className="collection-row">{props.collections.map(collection => { const done = collection.files.filter(file => props.progress[idOf(file)]?.done).length; return <button key={collection.key} className={collection.key === props.current?.key ? "active" : ""} onClick={() => props.onCollectionChange(collection.key)}><strong>{collection.name}</strong><span><i style={{ width: `${collection.files.length ? done / collection.files.length * 100 : 0}%` }} /> </span><small>{done}/{collection.files.length}</small></button>; })}</div></section>}
+      {props.collections.length > 1 && <CollectionPicker collections={props.collections} current={props.current} folderName={props.folderName} progress={props.progress} onCollectionChange={props.onCollectionChange} />}
 
       <section className="course-summary">
         <div className="summary-head"><div><span>课程进度</span><strong>{props.stats.done} / {props.files.length} 节</strong></div><b>{props.stats.pct}%</b></div>
