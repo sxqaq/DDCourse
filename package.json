@@ -1,6 +1,6 @@
 {
   "name": "ddcourse",
-  "version": "1.5.5",
+  "version": "1.5.6",
   "description": "一个轻量、私密、会记住学习进度的本地课程视频播放器。",
   "author": "DDCourse Contributors",
   "license": "AGPL-3.0",
@@ -19,6 +19,7 @@
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "desktop:bundle": "vite build --config desktop/vite.config.ts",
     "desktop:smoke": "npm run desktop:bundle && node scripts/desktop-smoke.mjs",
+    "desktop:smoke:upgrade": "node scripts/desktop-upgrade-smoke.mjs",
     "desktop:smoke:packaged": "npm run desktop:verify-package && node scripts/desktop-smoke.mjs release/win-unpacked/DDCourse.exe",
     "desktop:verify-package": "node scripts/verify-desktop-package.mjs",
     "desktop:check": "node --check electron/main.cjs && node --check electron/preload.cjs && node --check electron/serial-queue.cjs",
@@ -50,6 +51,11 @@
     "vinext": "0.0.50",
     "vite": "8.0.13",
     "workbox-build": "7.4.1"
+  },
+  "overrides": {
+    "js-yaml": "4.3.0",
+    "postcss": "8.5.21",
+    "sharp": "0.35.3"
   },
   "build": {
     "appId": "com.ddcourse.player",

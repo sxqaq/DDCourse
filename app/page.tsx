@@ -20,7 +20,7 @@ import { useVoiceEnhancer } from "./hooks/useVoiceEnhancer";
 import { normalizeProgressId } from "./progress-backup.mjs";
 import { createSubtitleObjectUrl, subtitleKindFromName } from "./media-utils";
 import { createCollectionMarkdown, downloadText } from "./report-utils";
-import { readJson, readString, STORAGE_KEYS, writeString } from "./storage";
+import { normalizeLastSelection, readJson, readString, STORAGE_KEYS, writeString } from "./storage";
 import type { Collection, CourseFile, DesktopFolder, StudyBookmark, StudyNote } from "./types";
 
 export default function Home() {
@@ -43,10 +43,10 @@ export default function Home() {
   const { weekSeconds, trackVideoTime } = useStudyTime();
   const { notes, bookmarks, deletions, mergeDesktopData, addNote: storeNote, editNote: updateNote, deleteNote: removeNote, addBookmark: storeBookmark, editBookmark: updateBookmark, deleteBookmark: removeBookmark } = useNotesAndBookmarks();
   const { font, setFont, scale, setScale, theme, setTheme, fontName, importFont } = useAppearance();
-  const { isDesktop, restoreFolder, loadNotes, saveNotes, saveAndShowNotes, chooseFolder, revealPath, readSubtitle } = useDesktopBridge();
+  const { isDesktop, restoreFolder, loadNotes, saveNotes, saveAndShowNotes, chooseFolder, revealPath, getNativePath, readSubtitle } = useDesktopBridge();
   const current = library.current, files = library.files;
   const activeIndex = files.findIndex(file => idOf(file) === activeId), activeFile = activeIndex >= 0 ? files[activeIndex] : null;
-  const { videoRef, sourceUrl, recordCurrent, savePeriodically, stopCurrentPlayer, playFile, queueNext, step, adjacent, togglePlayback, onLoaded } = usePlayer({ files, activeFile, activeIndex, collectionKey: current?.key, speed, setSpeed, progress, idOf, setActiveId, saveProgress });
+  const { videoRef, sourceUrl, recordCurrent, savePeriodically, stopCurrentPlayer, playFile, queueNext, step, adjacent, togglePlayback, onLoaded, onPause } = usePlayer({ files, activeFile, activeIndex, collectionKey: current?.key, speed, setSpeed, progress, idOf, setActiveId, saveProgress });
   const updater = useDesktopUpdater();
   const pictureInPicture = usePictureInPicture(videoRef);
   const { installed: pwaInstalled, installApp } = usePwaInstall(setNotice);
@@ -92,7 +92,7 @@ export default function Home() {
   useEffect(() => {
     if (!collections.length || activeId || restoredRef.current) return;
     restoredRef.current = true;
-    const last = readJson<{ collection: string; id: string } | null>(STORAGE_KEYS.last, null); if (!last) return;
+    const last = normalizeLastSelection(readJson<unknown>(STORAGE_KEYS.last, null)); if (!last) return;
     const normalizedId = normalizeProgressId(last.id || "");
     const previousCollection = collections.find(collection => collection.key === last.collection && collection.files.some(file => idOf(file) === normalizedId));
     if (previousCollection && current?.key !== previousCollection.key) {
@@ -113,11 +113,12 @@ export default function Home() {
   }, [bookmarks, notes, query]);
 
   const stats = useMemo(() => {
-    const duration = files.reduce((sum, file) => sum + (progress[idOf(file)]?.duration || 0), 0);
-    const watched = files.reduce((sum, file) => { const record = progress[idOf(file)]; return sum + (record?.done ? record.duration : Math.min(record?.time || 0, record?.duration || Infinity)); }, 0);
-    const done = files.filter(file => progress[idOf(file)]?.done).length;
-    return { done, duration, pct: duration ? Math.min(100, Math.round(watched / duration * 100)) : files.length ? Math.round(done / files.length * 100) : 0 };
-  }, [files, progress]);
+    const sourceFiles = current?.allFiles || [];
+    const duration = sourceFiles.reduce((sum, file) => sum + (progress[idOf(file)]?.duration || 0), 0);
+    const watched = sourceFiles.reduce((sum, file) => { const record = progress[idOf(file)]; return sum + (record?.done ? record.duration : Math.min(record?.time || 0, record?.duration || Infinity)); }, 0);
+    const done = sourceFiles.filter(file => progress[idOf(file)]?.done).length;
+    return { done, duration, pct: duration ? Math.min(100, Math.round(watched / duration * 100)) : sourceFiles.length ? Math.round(done / sourceFiles.length * 100) : 0 };
+  }, [current, progress]);
 
   const pickFolder = async () => { if (isDesktop) { const result = await chooseFolder(); if (result?.files.length) loadDesktopResult(result, `已载入 ${result.files.length} 个视频`); else if (result) setNotice("这个文件夹里没有可播放的视频"); return; } folderRef.current?.click(); };
   const refreshFolder = async () => {
@@ -132,15 +133,15 @@ export default function Home() {
     try { const result = await importProgressFile(file), imported = activeFile ? result.progress[idOf(activeFile)] : undefined; if (imported && videoRef.current) { const video = videoRef.current; if (imported.time >= 0 && (!Number.isFinite(video.duration) || imported.time <= video.duration)) video.currentTime = imported.time; if (imported.speed) { video.playbackRate = imported.speed; setSpeed(imported.speed); } } setNotice(`学习进度已成功导入（${result.importedCount} 条）`); }
     catch { setNotice("这不是有效的 DDCourse 进度文件"); } finally { event.target.value = ""; }
   };
-  const resetCurrent = () => { if (!current || !confirm(`清空“${current.name}”的全部播放进度？`)) return; stopAndClearActive(); resetFiles(current.files.map(idOf)); };
+  const resetCurrent = () => { if (!current || !confirm(`清空“${current.name}”的全部播放进度？`)) return; stopAndClearActive(); resetFiles(current.allFiles.map(idOf)); };
   const renameCollection = (collection: Collection) => { const name = prompt("合集显示名称：", collection.name); if (name !== null) library.renameCollection(collection.key, name); };
   const resetCollection = (collection: Collection) => {
     if (!confirm(`清空“${collection.name}”的全部播放进度？`)) return;
-    if (activeFile && collection.files.some(file => idOf(file) === idOf(activeFile))) stopAndClearActive();
-    resetFiles(collection.files.map(idOf)); setNotice(`已重置“${collection.name}”`);
+    if (activeFile && collection.allFiles.some(file => idOf(file) === idOf(activeFile))) stopAndClearActive();
+    resetFiles(collection.allFiles.map(idOf)); setNotice(`已重置“${collection.name}”`);
   };
   const exportCollection = (collection: Collection) => {
-    downloadText(`DDCourse-${collection.name}-学习报告.md`, createCollectionMarkdown(collection, progress, notes, bookmarks));
+    downloadText(`DDCourse-${collection.name}-学习报告.md`, createCollectionMarkdown({ ...collection, files: collection.allFiles }, progress, notes, bookmarks));
     setNotice(`已导出“${collection.name}”学习报告`);
   };
   const nativePathLabel = (file: CourseFile) => {
@@ -154,7 +155,7 @@ export default function Home() {
   };
   const resetFile = (file: CourseFile) => { if (activeId === idOf(file)) stopAndClearActive(); resetFiles([idOf(file)]); setNotice("这一节的进度已重置"); };
   const hideFile = (file: CourseFile) => { if (activeId === idOf(file)) stopAndClearActive(); library.hideFile(file); setNotice("已从课程列表隐藏，可在底部恢复"); };
-  const copyFilePath = async (file: CourseFile) => { try { await navigator.clipboard.writeText(nativePathLabel(file)); setNotice("文件路径已复制"); } catch { setNotice("无法复制文件路径"); } };
+  const copyFilePath = async (file: CourseFile) => { try { const source = file.nativeUrl || file.webkitRelativePath || file.name; const label = isDesktop ? await getNativePath(source) : nativePathLabel(file); await navigator.clipboard.writeText(label); setNotice("文件路径已复制"); } catch { setNotice("无法复制文件路径"); } };
   const revealFile = async (file: CourseFile) => { try { await revealPath(file.nativeUrl || file.webkitRelativePath || ""); } catch { setNotice("无法在文件管理器中定位"); } };
   const addBookmark = () => { const time = videoRef.current?.currentTime || 0; if (!activeFile) return; storeBookmark({ fileId: idOf(activeFile), fileName: cleanName(activeFile.name), time, label: "重点" }); setNotice(`已收藏 ${timeLabel(time)} 的知识点`); };
   const editBookmark = (item: StudyBookmark) => { const label = prompt("修改重点名称：", item.label || "重点"); if (label?.trim()) updateBookmark(item.id, { label: label.trim() }); };
@@ -182,11 +183,27 @@ export default function Home() {
   };
   const onDrop = (event: DragEvent) => { event.preventDefault(); setDragging(false); if (event.dataTransfer.files.length) loadBrowserFiles(event.dataTransfer.files, false); };
   const changeCollapsed = (value: boolean) => { setCollapsed(value); writeString("lumacourse_sidebar", value ? "1" : "0"); };
+  const playFromSidebar = (file: CourseFile, targetCollectionKey: string) => {
+    setViewingNotesFile(null);
+    if (targetCollectionKey !== current?.key) setCollectionKey(targetCollectionKey);
+    playFile(file, undefined, targetCollectionKey);
+  };
+  const jumpToTime = (time: number) => {
+    const target = viewingNotesFile;
+    if (target && idOf(target) !== (activeFile ? idOf(activeFile) : "")) {
+      const targetCollection = collections.find(collection => collection.files.some(file => idOf(file) === idOf(target)));
+      if (targetCollection && targetCollection.key !== current?.key) setCollectionKey(targetCollection.key);
+      setViewingNotesFile(null);
+      playFile(target, time, targetCollection?.key);
+      return;
+    }
+    if (videoRef.current) videoRef.current.currentTime = time;
+  };
 
   return <main className={`shell ${collapsed ? "is-collapsed" : ""}`} onDragOver={event => { event.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={onDrop}>
     {dragging && <div className="dropzone"><div><span>＋</span><strong>松开以载入课程视频</strong><small>实际播放能力取决于视频编码和系统支持</small></div></div>}
-    <CourseSidebar allFilesCount={library.allFiles.length} collections={library.collections} current={current} files={files} folderName={library.folderName} folderMode={library.folderMode} progress={progress} query={query} unfinished={unfinished} activeId={activeId} stats={stats} weekSeconds={weekSeconds} folderRef={folderRef} filesRef={filesRef} importRef={importRef} onPrimaryAction={library.folderMode ? refreshFolder : pickFolder} onSecondaryAction={library.folderMode ? pickFolder : () => filesRef.current?.click()} onFolderInput={event => { if (event.target.files) loadBrowserFiles(event.target.files, true); event.target.value = ""; }} onFilesInput={event => { if (event.target.files) loadBrowserFiles(event.target.files, false); event.target.value = ""; }} onCollectionChange={key => { stopAndClearActive(); setViewingNotesFile(null); library.setCollectionKey(key); }} onQueryChange={setQuery} onUnfinishedChange={setUnfinished} onPlayFile={file => { setViewingNotesFile(null); playFile(file); }} onShowNotes={showNotesLocation} onImportProgress={importProgress} onExportProgress={exportProgress} onReset={resetCurrent} noteMatchIds={noteMatchIds} hiddenCount={library.hiddenCount} onRestoreHidden={library.restoreHiddenFiles} onRenameCollection={renameCollection} onResetCollection={resetCollection} onRevealCollection={isDesktop ? collection => { const file = collection.files[0]; if (file) revealFile(file); } : undefined} onExportCollection={exportCollection} onTogglePinnedCollection={collection => library.togglePinned(collection.key)} onToggleSkippedCollection={collection => library.toggleSkipped(collection.key)} onToggleFileDone={toggleFileDone} onResetFile={resetFile} onViewFileNotes={setViewingNotesFile} onQueueFile={file => { queueNext(file); setNotice(`下一节将播放：${cleanName(file.name)}`); }} onHideFile={hideFile} onCopyFilePath={copyFilePath} onRevealFile={isDesktop ? revealFile : undefined}/>
-    <PlayerStage collapsed={collapsed} onCollapsedChange={changeCollapsed} currentName={current?.name} activeFile={activeFile} installed={installed} onInstall={installApp} appearanceOpen={appearanceOpen} setAppearanceOpen={setAppearanceOpen} font={font} setFont={setFont} scale={scale} setScale={setScale} theme={theme} setTheme={setTheme} fontName={fontName} importFont={importFont} isFullscreen={isFullscreen} onToggleFullscreen={toggleFullscreen} onPickFolder={pickFolder} videoRef={videoRef} videoDuration={videoRef.current?.duration || 0} videoCurrentTime={videoCurrentTime} videoSource={sourceUrl} subtitleUrl={subtitleUrl} onJumpToTime={time => { if (videoRef.current) videoRef.current.currentTime = time; }} onVideoFullscreen={toggleVideoFullscreen} pipSupported={pictureInPicture.supported} pipActive={pictureInPicture.active} onTogglePip={togglePip} updaterVisible={updater.isDesktop} updaterLabel={updaterLabel} updaterDisabled={updater.status.state === "checking" || updater.status.state === "downloading"} onUpdateAction={runUpdateAction} onLoaded={onLoaded} onTimeUpdate={currentTime => { setVideoCurrentTime(currentTime); trackVideoTime(currentTime); savePeriodically(); }} onPause={() => recordCurrent()} onEnded={() => { recordCurrent(true); adjacent(1); }} progress={progress} notes={notes} bookmarks={bookmarks} onShowNotes={showNotesLocation} onAddBookmark={addBookmark} onAddNote={addNote} onEditBookmark={editBookmark} onDeleteBookmark={deleteBookmark} onEditNote={editNote} onDeleteNote={deleteNote} viewingNotesFile={viewingNotesFile} onCloseNotesView={() => setViewingNotesFile(null)} activeIndex={activeIndex} filesLength={files.length} onAdjacent={adjacent} onStep={step} onTogglePlayback={togglePlayback} compressor={compressor} onToggleCompressor={toggleCompressor} speed={speed} setSpeed={setSpeed}/>
+    <CourseSidebar allFilesCount={library.allFiles.length} collections={library.collections} current={current} files={files} folderName={library.folderName} folderMode={library.folderMode} progress={progress} query={query} unfinished={unfinished} activeId={activeId} stats={stats} weekSeconds={weekSeconds} folderRef={folderRef} filesRef={filesRef} importRef={importRef} onPrimaryAction={library.folderMode ? refreshFolder : pickFolder} onSecondaryAction={library.folderMode ? pickFolder : () => filesRef.current?.click()} onFolderInput={event => { if (event.target.files) loadBrowserFiles(event.target.files, true); event.target.value = ""; }} onFilesInput={event => { if (event.target.files) loadBrowserFiles(event.target.files, false); event.target.value = ""; }} onCollectionChange={key => { stopAndClearActive(); setViewingNotesFile(null); library.setCollectionKey(key); }} onQueryChange={setQuery} onUnfinishedChange={setUnfinished} onPlayFile={playFromSidebar} onShowNotes={showNotesLocation} onImportProgress={importProgress} onExportProgress={exportProgress} onReset={resetCurrent} noteMatchIds={noteMatchIds} hiddenCount={library.hiddenCount} onRestoreHidden={library.restoreHiddenFiles} onRenameCollection={renameCollection} onResetCollection={resetCollection} onRevealCollection={isDesktop ? collection => { const file = collection.allFiles[0]; if (file) revealFile(file); } : undefined} onExportCollection={exportCollection} onTogglePinnedCollection={collection => library.togglePinned(collection.key)} onToggleSkippedCollection={collection => library.toggleSkipped(collection.key)} onToggleFileDone={toggleFileDone} onResetFile={resetFile} onViewFileNotes={setViewingNotesFile} onQueueFile={file => { queueNext(file); setNotice(`下一节将播放：${cleanName(file.name)}`); }} onHideFile={hideFile} onCopyFilePath={copyFilePath} onRevealFile={isDesktop ? revealFile : undefined}/>
+    <PlayerStage collapsed={collapsed} onCollapsedChange={changeCollapsed} currentName={current?.name} activeFile={activeFile} installed={installed} onInstall={installApp} appearanceOpen={appearanceOpen} setAppearanceOpen={setAppearanceOpen} font={font} setFont={setFont} scale={scale} setScale={setScale} theme={theme} setTheme={setTheme} fontName={fontName} importFont={importFont} isFullscreen={isFullscreen} onToggleFullscreen={toggleFullscreen} onPickFolder={pickFolder} videoRef={videoRef} videoDuration={videoRef.current?.duration || 0} videoCurrentTime={videoCurrentTime} videoSource={sourceUrl} subtitleUrl={subtitleUrl} onJumpToTime={jumpToTime} onVideoFullscreen={toggleVideoFullscreen} pipSupported={pictureInPicture.supported} pipActive={pictureInPicture.active} onTogglePip={togglePip} updaterVisible={updater.isDesktop} updaterLabel={updaterLabel} updaterDisabled={updater.status.state === "checking" || updater.status.state === "downloading"} onUpdateAction={runUpdateAction} onLoaded={onLoaded} onTimeUpdate={currentTime => { setVideoCurrentTime(currentTime); trackVideoTime(currentTime); savePeriodically(); }} onPause={onPause} onEnded={() => { recordCurrent(true); adjacent(1); }} progress={progress} notes={notes} bookmarks={bookmarks} onShowNotes={showNotesLocation} onAddBookmark={addBookmark} onAddNote={addNote} onEditBookmark={editBookmark} onDeleteBookmark={deleteBookmark} onEditNote={editNote} onDeleteNote={deleteNote} viewingNotesFile={viewingNotesFile} onCloseNotesView={() => setViewingNotesFile(null)} activeIndex={activeIndex} filesLength={files.length} onAdjacent={adjacent} onStep={step} onTogglePlayback={togglePlayback} compressor={compressor} onToggleCompressor={toggleCompressor} speed={speed} setSpeed={setSpeed}/>
     {(notice || updateNotice) && <div className="toast" role="status" aria-live="polite">{notice || updateNotice}</div>}
   </main>;
 }

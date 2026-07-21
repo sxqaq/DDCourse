@@ -13,6 +13,8 @@ const eslintConfig = defineConfig([
     "desktop-dist/**",
     "dist/**",
     "release/**",
+    "test-results/**",
+    "playwright-report/**",
     "node_modules/**",
     "electron/**/*.cjs",
     "out/**",

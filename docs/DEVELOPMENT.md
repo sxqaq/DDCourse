@@ -13,6 +13,7 @@ npx tsc --noEmit --incremental false
 npm run build
 npm run test:e2e
 npm run desktop:smoke
+npm run desktop:smoke:upgrade
 npm run desktop:build
 npm run desktop:smoke:packaged
 ```
@@ -23,10 +24,9 @@ npm run desktop:smoke:packaged
 - `desktop/`：Electron 渲染端构建入口。
 - `electron/`：主进程与安全 preload 桥接。
 - `public/`：PWA manifest、图标和静态资源。正式构建后由 `scripts/generate-service-worker.mjs` 使用 Workbox 资源清单生成 Service Worker。
-- `worker/`：Cloudflare/vinext Worker 入口。
 - `tests/`：Node 单元与工程约束测试。
 
-`dist/`、`desktop-dist/`、`release/`、`.wrangler/` 和 TypeScript 增量缓存均为可再生成产物，不应提交。
+`dist/`、`desktop-dist/`、`release/` 和 TypeScript 增量缓存均为可再生成产物，不应提交。
 
 ## 修改原则
 
@@ -39,8 +39,9 @@ npm run desktop:smoke:packaged
 - 浏览器 API 的初始读取必须兼容服务端渲染；修改客户端初始化代码后应保留 SSR 渲染测试。
 - 桌面笔记 IPC 数据必须通过运行时 schema；写入由主进程串行化，渲染进程只负责 debounce。
 - PWA 资源变更必须通过正式构建生成新的预缓存清单，不手工维护静态缓存列表。
-- 离线导航回退使用 `/offline-shell`；该响应不得携带 Vinext 动态路由的 `Vary` 头。
+- 课程软隐藏只影响可见列表；统计、重置和报告必须使用合集的完整源文件集合。
+- 发布标签必须与 `package.json` 版本一致，且标签提交必须属于 `main`。
 
 ## 发布前检查
 
-依次执行类型检查、测试、lint、Web 正式构建、真实浏览器离线测试和桌面构建。手工验证目录刷新、断点续播、进度导入、跨周统计以及桌面笔记恢复。
+依次执行类型检查、测试、lint、Web 正式构建、真实浏览器离线测试、桌面升级持久性测试和桌面构建。手工验证目录刷新、断点续播、进度导入、跨周统计以及桌面笔记恢复。

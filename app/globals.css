@@ -16,6 +16,7 @@
 @media(max-width:860px){.shell{grid-template-columns:1fr;grid-template-rows:minmax(0,1fr) minmax(280px,42vh);overflow:auto}.shell.is-collapsed{grid-template-columns:1fr;grid-template-rows:100vh 0}.library{grid-row:2;border-right:0;border-top:1px solid var(--line)}.stage{grid-row:1;min-height:58vh}.is-collapsed .stage{min-height:100vh}.brand,.course-summary,.collections{display:none}.pick-area{padding:9px 12px}.library-footer{display:none}.stage{grid-template-rows:58px 1fr auto}.stage-top{padding:0 12px}.shortcut-hint,.local-badge{display:none}.player-wrap{padding:11px}.control-deck{padding:9px 13px;flex-wrap:wrap}.tools{margin-left:auto}.speed{grid-template-columns:auto 80px 38px}.welcome h1{font-size:32px}.pixel-scene{width:76px;height:76px}.map-legend{display:none}}
 @media(max-width:520px){.voice,.speed span{display:none}.speed{grid-template-columns:72px 38px}.control-deck{justify-content:center}.tools{margin-left:0}.stage-top strong{max-width:48vw}.map-actions button{font-size:0}.map-actions button:first-child:after{content:"★";font-size:10px}.map-actions button:last-child:after{content:"▤";font-size:10px}}
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
+.lesson{min-height:58px;box-sizing:border-box}
 /* Appearance preferences override the static defaults above. */
 html,body{font-family:var(--app-font)}button,input,select,textarea{font-family:inherit}
 .stage-top{position:relative;z-index:60}.player-wrap{z-index:0}.appearance-panel{z-index:120}

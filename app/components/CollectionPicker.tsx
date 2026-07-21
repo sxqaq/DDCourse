@@ -2,7 +2,7 @@
 
 import { useMemo, useState, type KeyboardEvent, type MouseEvent } from "react";
 import { idOf } from "../course-utils";
-import { readJson, writeJson } from "../storage";
+import { normalizeStringListRecord, readJson, writeJson } from "../storage";
 import type { Collection, ProgressMap } from "../types";
 import { ContextMenu, type ContextMenuItem } from "./ContextMenu";
 
@@ -25,13 +25,13 @@ type Props = {
 };
 
 export function CollectionPicker({ collections, current, folderName, progress, onCollectionChange, onRename, onReset, onReveal, onExportReport, onTogglePinned, onToggleSkipped }: Props) {
-  const [collapsedFolders, setCollapsedFolders] = useState<CollapsedFolders>(() => readJson(STORAGE_KEY, {}));
+  const [collapsedFolders, setCollapsedFolders] = useState<CollapsedFolders>(() => normalizeStringListRecord(readJson<unknown>(STORAGE_KEY, {})));
   const [contextMenu, setContextMenu] = useState<ContextMenu>(null);
   const folderKey = folderName || "__default__";
   const collapsedKeys = useMemo(() => new Set(collapsedFolders[folderKey] || []), [collapsedFolders, folderKey]);
   const stats = useMemo(() => new Map(collections.map(collection => {
-    const done = collection.files.filter(file => progress[idOf(file)]?.done).length;
-    return [collection.key, { done, complete: collection.files.length > 0 && done === collection.files.length }];
+    const done = collection.allFiles.filter(file => progress[idOf(file)]?.done).length;
+    return [collection.key, { done, complete: collection.allFiles.length > 0 && done === collection.allFiles.length }];
   })), [collections, progress]);
   const visibleCollections = collections.filter(collection => !collapsedKeys.has(collection.key));
   const collapsedCollections = collections.filter(collection => collapsedKeys.has(collection.key));
@@ -85,8 +85,8 @@ export function CollectionPicker({ collections, current, folderName, progress, o
           title={`${collection.name}；右键打开合集操作`}
         >
           <strong>{collection.pinned ? "★ " : ""}{collection.name}</strong>
-          <span><i style={{ width: `${collection.files.length ? collectionStats.done / collection.files.length * 100 : 0}%` }} /></span>
-          <small>{collection.skipped ? "暂不学习" : collectionStats.complete ? "已完成" : `${collectionStats.done}/${collection.files.length}`}</small>
+          <span><i style={{ width: `${collection.allFiles.length ? collectionStats.done / collection.allFiles.length * 100 : 0}%` }} /></span>
+          <small>{collection.skipped ? "暂不学习" : collectionStats.complete ? "已完成" : `${collectionStats.done}/${collection.allFiles.length}`}</small>
         </button>;
       })}
     </div>}

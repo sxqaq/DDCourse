@@ -149,6 +149,13 @@ ipcMain.handle("course-file:reveal", async (event, nativeUrlOrPath) => {
   shell.showItemInFolder(target);
 });
 
+ipcMain.handle("course-file:native-path", async (event, nativeUrlOrPath) => {
+  assertTrustedSender(event);
+  // Convert in the main process so Node's fileURLToPath preserves UNC hosts
+  // (file://server/share becomes \\server\share) on Windows.
+  return await pathInsideLastFolder(nativeUrlOrPath);
+});
+
 ipcMain.handle("subtitle:read", async (event, nativeUrlOrPath) => {
   assertTrustedSender(event);
   const target = await pathInsideLastFolder(nativeUrlOrPath);
@@ -174,7 +181,8 @@ function updaterErrorMessage(error) {
 }
 
 autoUpdater.autoDownload = false;
-autoUpdater.autoInstallOnAppQuit = true;
+// Install only after the user explicitly requests it and the renderer saves data.
+autoUpdater.autoInstallOnAppQuit = false;
 autoUpdater.on("checking-for-update", () => publishUpdateStatus({ state: "checking" }));
 autoUpdater.on("update-available", info => publishUpdateStatus({ state: "available", version: info.version }));
 autoUpdater.on("update-not-available", info => publishUpdateStatus({ state: "up-to-date", version: info.version }));

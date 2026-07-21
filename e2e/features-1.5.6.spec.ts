@@ -29,8 +29,41 @@ test("video context actions persist manual completion and can restore hidden les
   await lesson.click({ button: "right" });
   await page.getByRole("menuitem", { name: "从课程列表隐藏" }).click();
   await expect(page.getByRole("button", { name: /intro/ })).toHaveCount(0);
+  page.once("dialog", dialog => dialog.accept());
+  await page.getByRole("button", { name: "重置", exact: true }).click();
   await page.getByRole("button", { name: /恢复隐藏/ }).click();
   await expect(page.getByRole("button", { name: /intro/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /intro/ })).not.toHaveClass(/done/);
+});
+
+test("malformed course preferences cannot white-screen startup", async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem("ddcourse_collection_names_v1", JSON.stringify(["wrong shape"]));
+    localStorage.setItem("ddcourse_collection_order_v1", JSON.stringify({ wrong: true }));
+    localStorage.setItem("ddcourse_skipped_collections_v1", JSON.stringify("wrong shape"));
+    localStorage.setItem("ddcourse_hidden_files_v1", JSON.stringify({ length: 10 }));
+    localStorage.setItem("ddcourse_collapsed_collections_v1", JSON.stringify(["wrong shape"]));
+    localStorage.setItem("lumacourse_last_v1", JSON.stringify({ collection: [], id: 12 }));
+  });
+  await page.goto("/");
+  await expect(page.getByText("DDCourse", { exact: true }).first()).toBeVisible();
+  await loadCourses(page);
+  await expect(page.getByRole("button", { name: /intro/ })).toBeVisible();
+});
+
+test("note full-text search opens a result from another collection", async ({ page }) => {
+  await page.addInitScript(() => {
+    const now = new Date().toISOString();
+    localStorage.setItem("ddcourse_notes_v1", JSON.stringify([{ id: "cross-note", fileId: "Course/B/02-detail.mp4::13", fileName: "02-detail", time: 5, text: "跨合集关键字", createdAt: now, updatedAt: now }]));
+  });
+  await page.goto("/");
+  await loadCourses(page);
+  await page.getByPlaceholder("搜索课程、笔记或收藏…").fill("跨合集关键字");
+  const result = page.getByRole("button", { name: /detail/ });
+  await expect(result).toContainText("B ·");
+  await result.click();
+  await expect(page.locator(".collection-card.active")).toContainText("B");
+  await expect(page.getByRole("button", { name: /detail/ })).toHaveClass(/active/);
 });
 
 test("collection menu renames, pins and excludes skipped collections from overall progress", async ({ page }) => {
