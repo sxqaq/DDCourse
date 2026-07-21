@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld("ddcourseDesktop", {
   saveAndShowNotes: payload => ipcRenderer.invoke("notes:save-and-show", payload),
   saveNotes: payload => ipcRenderer.invoke("notes:save", payload),
   revealPath: nativeUrlOrPath => ipcRenderer.invoke("course-file:reveal", nativeUrlOrPath),
+  getNativePath: nativeUrlOrPath => ipcRenderer.invoke("course-file:native-path", nativeUrlOrPath),
   readSubtitle: nativeUrlOrPath => ipcRenderer.invoke("subtitle:read", nativeUrlOrPath),
   checkForUpdates: () => ipcRenderer.invoke("updates:check"),
   downloadUpdate: () => ipcRenderer.invoke("updates:download"),

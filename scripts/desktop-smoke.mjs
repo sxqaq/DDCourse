@@ -19,6 +19,7 @@ try {
     loadNotes: typeof window.ddcourseDesktop?.loadNotes,
     saveNotes: typeof window.ddcourseDesktop?.saveNotes,
     revealPath: typeof window.ddcourseDesktop?.revealPath,
+    getNativePath: typeof window.ddcourseDesktop?.getNativePath,
     readSubtitle: typeof window.ddcourseDesktop?.readSubtitle,
     checkForUpdates: typeof window.ddcourseDesktop?.checkForUpdates,
     downloadUpdate: typeof window.ddcourseDesktop?.downloadUpdate,
@@ -27,7 +28,7 @@ try {
   }));
   assert.deepEqual(bridge, {
     chooseFolder: "function", loadNotes: "function", saveNotes: "function",
-    revealPath: "function", readSubtitle: "function", checkForUpdates: "function",
+    revealPath: "function", getNativePath: "function", readSubtitle: "function", checkForUpdates: "function",
     downloadUpdate: "function", installUpdate: "function", onUpdateStatus: "function",
   });
   await window.getByRole("button", { name: "选择课程文件夹" }).waitFor({ state: "visible", timeout: 15_000 });

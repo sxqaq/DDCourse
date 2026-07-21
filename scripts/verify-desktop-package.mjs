@@ -19,6 +19,7 @@ const main = extractFile(archive, "electron/main.cjs").toString("utf8");
 const schema = extractFile(archive, "app/notes-schema.mjs").toString("utf8");
 assert.match(main, /import\("\.\.\/app\/notes-schema\.mjs"\)/);
 assert.match(main, /autoUpdater\.autoDownload = false/);
+assert.match(main, /autoUpdater\.autoInstallOnAppQuit = false/);
 assert.match(main, /autoUpdater\.quitAndInstall\(false, true\)/);
 assert.match(main, /pathInsideLastFolder/);
 assert.match(schema, /export function parseNotesDocument/);

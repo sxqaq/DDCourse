@@ -11,8 +11,9 @@ export function useDesktopBridge() {
   const saveNotes = useCallback((payload: unknown) => api?.saveNotes(payload) ?? Promise.resolve(""), [api]);
   const saveAndShowNotes = useCallback((payload: unknown) => api?.saveAndShowNotes(payload) ?? Promise.resolve(""), [api]);
   const revealPath = useCallback((nativeUrlOrPath: string) => api?.revealPath(nativeUrlOrPath) ?? Promise.resolve(), [api]);
+  const getNativePath = useCallback((nativeUrlOrPath: string) => api?.getNativePath(nativeUrlOrPath) ?? Promise.resolve(nativeUrlOrPath), [api]);
   const readSubtitle = useCallback((nativeUrlOrPath: string) => api?.readSubtitle(nativeUrlOrPath) ?? Promise.reject(new Error("桌面版才能读取本地字幕")), [api]);
-  return { isDesktop: Boolean(api), chooseFolder, restoreFolder, loadNotes, saveNotes, saveAndShowNotes, revealPath, readSubtitle };
+  return { isDesktop: Boolean(api), chooseFolder, restoreFolder, loadNotes, saveNotes, saveAndShowNotes, revealPath, getNativePath, readSubtitle };
 }
 
 declare global { interface Window { ddcourseDesktop?: DesktopApi } }

@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useState } from "react";
 import { idOf, pathOf, VIDEO_RE } from "../course-utils";
-import { readJson, STORAGE_KEYS, writeJson } from "../storage";
+import { normalizeStringList, normalizeStringRecord, readJson, STORAGE_KEYS, writeJson } from "../storage";
 import type { Collection, CourseFile, DesktopFolder } from "../types";
 
 function initialCollectionKey(files: CourseFile[]) {
@@ -10,38 +10,42 @@ function initialCollectionKey(files: CourseFile[]) {
   return parts.length > 1 ? parts.slice(0, -1).join("/") : "全部课程";
 }
 
+export function buildCollections(allFiles: CourseFile[], collectionNames: Record<string, string>, hiddenFiles: string[], pinnedCollections: string[], skippedCollections: string[]): Collection[] {
+  const map = new Map<string, CourseFile[]>();
+  const hidden = new Set(hiddenFiles);
+  for (const file of allFiles) {
+    const parts = pathOf(file).split(/[\\/]/).filter(Boolean);
+    const key = parts.length > 1 ? parts.slice(0, -1).join("/") : "全部课程";
+    let bucket = map.get(key);
+    if (!bucket) { bucket = []; map.set(key, bucket); }
+    bucket.push(file);
+  }
+  const pinned = new Map(pinnedCollections.map((key, index) => [key, index]));
+  return [...map.entries()].map(([key, sourceFiles]) => ({
+    key,
+    name: collectionNames[key] || key.split("/").pop() || key,
+    files: sourceFiles.filter(file => !hidden.has(idOf(file))),
+    allFiles: sourceFiles,
+    pinned: pinned.has(key),
+    skipped: skippedCollections.includes(key),
+  })).sort((a, b) => {
+    const aPin = pinned.get(a.key), bPin = pinned.get(b.key);
+    if (aPin !== undefined || bPin !== undefined) return aPin === undefined ? 1 : bPin === undefined ? -1 : aPin - bPin;
+    return a.key.localeCompare(b.key, "zh-CN", { numeric: true });
+  });
+}
+
 export function useCourseLibrary(onNotice: (message: string) => void) {
   const [allFiles, setAllFiles] = useState<CourseFile[]>([]);
   const [collectionKey, setCollectionKey] = useState("");
   const [folderName, setFolderName] = useState("");
   const [folderMode, setFolderMode] = useState(false);
-  const [collectionNames, setCollectionNames] = useState<Record<string, string>>(() => readJson(STORAGE_KEYS.collectionNames, {}));
-  const [pinnedCollections, setPinnedCollections] = useState<string[]>(() => readJson(STORAGE_KEYS.collectionOrder, []));
-  const [skippedCollections, setSkippedCollections] = useState<string[]>(() => readJson(STORAGE_KEYS.skippedCollections, []));
-  const [hiddenFiles, setHiddenFiles] = useState<string[]>(() => readJson(STORAGE_KEYS.hiddenFiles, []));
+  const [collectionNames, setCollectionNames] = useState<Record<string, string>>(() => normalizeStringRecord(readJson<unknown>(STORAGE_KEYS.collectionNames, {})));
+  const [pinnedCollections, setPinnedCollections] = useState<string[]>(() => normalizeStringList(readJson<unknown>(STORAGE_KEYS.collectionOrder, [])));
+  const [skippedCollections, setSkippedCollections] = useState<string[]>(() => normalizeStringList(readJson<unknown>(STORAGE_KEYS.skippedCollections, [])));
+  const [hiddenFiles, setHiddenFiles] = useState<string[]>(() => normalizeStringList(readJson<unknown>(STORAGE_KEYS.hiddenFiles, [])));
 
-  const collections = useMemo<Collection[]>(() => {
-    const map = new Map<string, CourseFile[]>();
-    const hidden = new Set(hiddenFiles);
-    allFiles.forEach(file => {
-      const parts = pathOf(file).split(/[\\/]/).filter(Boolean);
-      const key = parts.length > 1 ? parts.slice(0, -1).join("/") : "全部课程";
-      if (!hidden.has(idOf(file))) map.set(key, [...(map.get(key) || []), file]);
-      else if (!map.has(key)) map.set(key, []);
-    });
-    const pinned = new Map(pinnedCollections.map((key, index) => [key, index]));
-    return [...map.entries()].map(([key, files]) => ({
-      key,
-      name: collectionNames[key] || key.split("/").pop() || key,
-      files,
-      pinned: pinned.has(key),
-      skipped: skippedCollections.includes(key),
-    })).sort((a, b) => {
-      const aPin = pinned.get(a.key), bPin = pinned.get(b.key);
-      if (aPin !== undefined || bPin !== undefined) return aPin === undefined ? 1 : bPin === undefined ? -1 : aPin - bPin;
-      return a.key.localeCompare(b.key, "zh-CN", { numeric: true });
-    });
-  }, [allFiles, collectionNames, hiddenFiles, pinnedCollections, skippedCollections]);
+  const collections = useMemo<Collection[]>(() => buildCollections(allFiles, collectionNames, hiddenFiles, pinnedCollections, skippedCollections), [allFiles, collectionNames, hiddenFiles, pinnedCollections, skippedCollections]);
 
   const current = collections.find(collection => collection.key === collectionKey) || collections[0];
   const files = useMemo(() => current?.files || [], [current]);

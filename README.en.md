@@ -17,6 +17,9 @@ The entire project—including product design, source code, tests, build and rel
 - Resume playback and per-video speed memory
 - Course progress, completion state, and weekly focus time
 - Search and unfinished-only filtering
+- Cross-collection search across lessons, notes, and bookmarks with direct time jumps
+- SRT/VTT subtitles, picture-in-picture, video fullscreen, and thumbnail previews
+- Collection/lesson context actions, soft hiding, and Markdown study reports
 - 0.5×–3× playback speed with Q/W/E/R presets
 - Voice enhancement through the Web Audio API
 - Previous/next lesson and 10-second seek controls
@@ -42,7 +45,7 @@ Detailed documents are currently maintained in Chinese. After a course folder is
 
 ### Windows EXE installer (recommended)
 
-Download `DDCourse-Setup-1.5.5.exe` from the project Releases page and follow the setup wizard. The installer provides:
+Download `DDCourse-Setup-1.5.6.exe` from the project Releases page and follow the setup wizard. The installer provides:
 
 - A selectable installation directory
 - A desktop shortcut
@@ -57,13 +60,13 @@ npm install
 npm run desktop:build
 ```
 
-The generated installer is saved as `release/DDCourse-Setup-1.5.5.exe`.
+The generated installer is saved as `release/DDCourse-Setup-1.5.6.exe`.
 
 ### In-app manual updates
 
-Starting with 1.5.5, the Windows installer build provides **Check for updates** in the top-right corner. Downloading and restarting remain explicit user actions. Updating replaces application files only and preserves progress, the recent folder, collection preferences, themes, custom fonts, and notes under `Documents\\DDCourse`.
+Starting with 1.5.5, the Windows installer build provides **Check for updates** in the top-right corner. Checking, downloading, and installing remain explicit user actions; a normal application exit never installs a downloaded update. Updating replaces application files only and preserves progress, the recent folder, collection preferences, themes, custom fonts, and notes under `Documents\\DDCourse`.
 
-Versions 1.5.0 and older must install 1.5.5 manually once. Later releases can then be installed from inside the app.
+Versions 1.5.0 and older must manually install 1.5.5 or a later release once. Later releases can then be installed from inside the app.
 
 ## Back up and restore learning progress
 

@@ -2,6 +2,9 @@
 /* eslint-disable @next/next/no-img-element -- data URL thumbnails are generated locally. */
 
 import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { LruCache } from "../lru-cache";
+
+const MAX_CACHED_THUMBNAILS = 60;
 
 type Props = {
   src: string;
@@ -26,7 +29,7 @@ export function VideoPreviewBar({
 }: Props) {
   const previewVideoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const cacheRef = useRef(new Map<number, string>());
+  const cacheRef = useRef(new LruCache<number, string>(MAX_CACHED_THUMBNAILS));
   const pendingSlotRef = useRef<number | null>(null);
   const lastRequestRef = useRef(0);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
