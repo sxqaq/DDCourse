@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState, type KeyboardEvent, type MouseEvent } from "react";
+import { useMemo, useState, type KeyboardEvent, type MouseEvent } from "react";
 import { idOf } from "../course-utils";
 import { readJson, writeJson } from "../storage";
 import type { Collection, ProgressMap } from "../types";
+import { ContextMenu, type ContextMenuItem } from "./ContextMenu";
 
 const STORAGE_KEY = "ddcourse_collapsed_collections_v1";
 type CollapsedFolders = Record<string, string[]>;
@@ -15,9 +16,15 @@ type Props = {
   folderName: string;
   progress: ProgressMap;
   onCollectionChange: (key: string) => void;
+  onRename: (collection: Collection) => void;
+  onReset: (collection: Collection) => void;
+  onReveal?: (collection: Collection) => void;
+  onExportReport: (collection: Collection) => void;
+  onTogglePinned: (collection: Collection) => void;
+  onToggleSkipped: (collection: Collection) => void;
 };
 
-export function CollectionPicker({ collections, current, folderName, progress, onCollectionChange }: Props) {
+export function CollectionPicker({ collections, current, folderName, progress, onCollectionChange, onRename, onReset, onReveal, onExportReport, onTogglePinned, onToggleSkipped }: Props) {
   const [collapsedFolders, setCollapsedFolders] = useState<CollapsedFolders>(() => readJson(STORAGE_KEY, {}));
   const [contextMenu, setContextMenu] = useState<ContextMenu>(null);
   const folderKey = folderName || "__default__";
@@ -29,22 +36,6 @@ export function CollectionPicker({ collections, current, folderName, progress, o
   const visibleCollections = collections.filter(collection => !collapsedKeys.has(collection.key));
   const collapsedCollections = collections.filter(collection => collapsedKeys.has(collection.key));
   const completedVisible = visibleCollections.filter(collection => stats.get(collection.key)?.complete);
-
-  useEffect(() => {
-    if (!contextMenu) return;
-    const close = () => setContextMenu(null);
-    const onKeyDown = (event: globalThis.KeyboardEvent) => { if (event.key === "Escape") close(); };
-    window.addEventListener("pointerdown", close);
-    window.addEventListener("resize", close);
-    window.addEventListener("scroll", close, true);
-    window.addEventListener("keydown", onKeyDown);
-    return () => {
-      window.removeEventListener("pointerdown", close);
-      window.removeEventListener("resize", close);
-      window.removeEventListener("scroll", close, true);
-      window.removeEventListener("keydown", onKeyDown);
-    };
-  }, [contextMenu]);
 
   const saveCollapsed = (next: Set<string>) => {
     const nextFolders = { ...collapsedFolders, [folderKey]: [...next] };
@@ -64,7 +55,7 @@ export function CollectionPicker({ collections, current, folderName, progress, o
     onCollectionChange(key);
   };
   const openContextMenu = (key: string, x: number, y: number) => {
-    setContextMenu({ key, x: Math.min(x, window.innerWidth - 154), y: Math.min(y, window.innerHeight - 54) });
+    setContextMenu({ key, x, y });
   };
   const onContextMenu = (event: MouseEvent<HTMLButtonElement>, key: string) => {
     event.preventDefault();
@@ -87,15 +78,15 @@ export function CollectionPicker({ collections, current, folderName, progress, o
         const collectionStats = stats.get(collection.key) || { done: 0, complete: false };
         return <button
           key={collection.key}
-          className={`collection-card ${collection.key === current?.key ? "active" : ""} ${collectionStats.complete ? "complete" : ""}`}
+          className={`collection-card ${collection.key === current?.key ? "active" : ""} ${collectionStats.complete ? "complete" : ""} ${collection.skipped ? "skipped" : ""}`}
           onClick={() => onCollectionChange(collection.key)}
           onContextMenu={event => onContextMenu(event, collection.key)}
           onKeyDown={event => onCollectionKeyDown(event, collection.key)}
-          title={`${collection.name}；右键可收起`}
+          title={`${collection.name}；右键打开合集操作`}
         >
-          <strong>{collection.name}</strong>
+          <strong>{collection.pinned ? "★ " : ""}{collection.name}</strong>
           <span><i style={{ width: `${collection.files.length ? collectionStats.done / collection.files.length * 100 : 0}%` }} /></span>
-          <small>{collectionStats.complete ? "已完成" : `${collectionStats.done}/${collection.files.length}`}</small>
+          <small>{collection.skipped ? "暂不学习" : collectionStats.complete ? "已完成" : `${collectionStats.done}/${collection.files.length}`}</small>
         </button>;
       })}
     </div>}
@@ -103,8 +94,19 @@ export function CollectionPicker({ collections, current, folderName, progress, o
       <summary>已收起 {collapsedCollections.length} 个合集</summary>
       <div>{collapsedCollections.map(collection => <button key={collection.key} onClick={() => restore(collection.key)}>{collection.name}<span>展开</span></button>)}</div>
     </details>}
-    {contextMenu && <div className="collection-context-menu" role="menu" style={{ left: contextMenu.x, top: contextMenu.y }} onPointerDown={event => event.stopPropagation()}>
-      <button role="menuitem" onClick={() => collapse([contextMenu.key])}>收起此合集</button>
-    </div>}
+    {contextMenu && (() => {
+      const collection = collections.find(item => item.key === contextMenu.key);
+      if (!collection) return null;
+      const items: ContextMenuItem[] = [
+        { label: "重命名合集", onClick: () => onRename(collection) },
+        { label: "重置该合集进度", onClick: () => onReset(collection), danger: true },
+        ...(onReveal ? [{ label: "在文件管理器中定位", onClick: () => onReveal(collection) }] : []),
+        { label: "导出学习报告（Markdown）", onClick: () => onExportReport(collection) },
+        { label: collection.pinned ? "取消置顶" : "置顶合集", onClick: () => onTogglePinned(collection) },
+        { label: collection.skipped ? "恢复学习并计入进度" : "暂不学习（不计总体进度）", onClick: () => onToggleSkipped(collection) },
+        { label: "收起此合集", onClick: () => collapse([collection.key]) },
+      ];
+      return <ContextMenu x={contextMenu.x} y={contextMenu.y} items={items} onClose={() => setContextMenu(null)}/>;
+    })()}
   </section>;
 }

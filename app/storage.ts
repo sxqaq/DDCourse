@@ -6,6 +6,11 @@ export const STORAGE_KEYS = {
   bookmarks: "ddcourse_bookmarks_v1",
   notes: "ddcourse_notes_v1",
   noteDeletions: "ddcourse_note_deletions_v1",
+  collectionNames: "ddcourse_collection_names_v1",
+  collectionOrder: "ddcourse_collection_order_v1",
+  skippedCollections: "ddcourse_skipped_collections_v1",
+  hiddenFiles: "ddcourse_hidden_files_v1",
+  theme: "ddcourse_theme_v1",
 } as const;
 
 export function readJson<T>(key: string, fallback: T): T {

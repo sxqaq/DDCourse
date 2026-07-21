@@ -1,6 +1,6 @@
-# Web、PWA 与桌面端
+# 本地浏览器构建与桌面端
 
-Web/PWA 和 Electron 共用主要 React 界面，但文件权限不同。
+项目不再发布官方 Web 站点。用于开发和自动测试的本地浏览器构建与 Electron 仍共用主要 React 界面，但文件权限不同。
 
 | 能力 | Web/PWA | Electron |
 | --- | --- | --- |

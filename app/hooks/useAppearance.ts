@@ -4,6 +4,8 @@ import { ChangeEvent, useEffect, useState } from "react";
 
 const FONT_KEY = "ddcourse_font_v1";
 const SCALE_KEY = "ddcourse_font_scale_v1";
+const THEME_KEY = "ddcourse_theme_v1";
+export type AppearanceTheme = "system" | "light" | "dark";
 const families: Record<string, string> = {
   misans: '"MiSans","HarmonyOS Sans","OPPO Sans","Source Han Sans SC","PingFang SC",sans-serif',
   system: 'system-ui,-apple-system,"Segoe UI","PingFang SC",sans-serif',
@@ -15,6 +17,11 @@ const families: Record<string, string> = {
 function browserStorageValue(key: string) {
   if (typeof window === "undefined") return null;
   try { return window.localStorage.getItem(key); } catch { return null; }
+}
+
+function storedTheme(): AppearanceTheme {
+  const value = browserStorageValue(THEME_KEY);
+  return value === "light" || value === "dark" || value === "system" ? value : "system";
 }
 
 function fontDatabase() {
@@ -58,6 +65,7 @@ async function activateCustomFont(buffer: ArrayBuffer) {
 export function useAppearance() {
   const [font, setFont] = useState(() => browserStorageValue(FONT_KEY) || "misans");
   const [scale, setScale] = useState(() => Number(browserStorageValue(SCALE_KEY)) || 1);
+  const [theme, setTheme] = useState<AppearanceTheme>(storedTheme);
   const [fontName, setFontName] = useState("自定义字体");
 
   useEffect(() => {
@@ -68,6 +76,11 @@ export function useAppearance() {
     document.documentElement.style.setProperty("--ui-scale", String(scale));
     try { localStorage.setItem(SCALE_KEY, String(scale)); } catch { /* Preferences remain in memory. */ }
   }, [scale]);
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    document.documentElement.style.colorScheme = theme === "system" ? "light dark" : theme;
+    try { localStorage.setItem(THEME_KEY, theme); } catch { /* Preferences remain in memory. */ }
+  }, [theme]);
   useEffect(() => {
     if (font === "custom") loadStoredFont().then(buffer => buffer && activateCustomFont(buffer)).catch(console.error);
   }, [font]);
@@ -84,5 +97,5 @@ export function useAppearance() {
     event.target.value = "";
   };
 
-  return { font, setFont, scale, setScale, fontName, importFont };
+  return { font, setFont, scale, setScale, theme, setTheme, fontName, importFont };
 }

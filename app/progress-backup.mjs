@@ -7,6 +7,7 @@ function isProgressRecord(value) {
   return isFiniteNonNegative(value.time)
     && isFiniteNonNegative(value.duration)
     && typeof value.done === "boolean"
+    && (value.doneOverride === undefined || typeof value.doneOverride === "boolean")
     && typeof value.updatedAt === "string"
     && !Number.isNaN(Date.parse(value.updatedAt))
     && (value.speed === undefined || (typeof value.speed === "number" && Number.isFinite(value.speed) && value.speed >= 0.5 && value.speed <= 3));
