@@ -10,7 +10,9 @@ export function useKeyboardShortcuts(handlers: Handlers) {
   ref.current = handlers;
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if ((event.target as HTMLElement)?.matches("input,textarea,[contenteditable=true]")) return;
+      if (event.repeat) return;
+      const target = event.target;
+      if (target instanceof Element && target.closest("button,input,select,textarea,[contenteditable]:not([contenteditable='false'])")) return;
       const current = ref.current;
       if (SPEEDS[event.code]) { event.preventDefault(); current.setSpeed(SPEEDS[event.code]); return; }
       if (!current.enabled) return;

@@ -42,7 +42,7 @@ Detailed documents are currently maintained in Chinese. After a course folder is
 
 ### Windows EXE installer (recommended)
 
-Download `DDCourse-Setup-1.5.0.exe` from the project Releases page and follow the setup wizard. The installer provides:
+Download `DDCourse-Setup-1.5.5.exe` from the project Releases page and follow the setup wizard. The installer provides:
 
 - A selectable installation directory
 - A desktop shortcut
@@ -57,7 +57,13 @@ npm install
 npm run desktop:build
 ```
 
-The generated installer is saved as `release/DDCourse-Setup-1.5.0.exe`.
+The generated installer is saved as `release/DDCourse-Setup-1.5.5.exe`.
+
+### In-app manual updates
+
+Starting with 1.5.5, the Windows installer build provides **Check for updates** in the top-right corner. Downloading and restarting remain explicit user actions. Updating replaces application files only and preserves progress, the recent folder, collection preferences, themes, custom fonts, and notes under `Documents\\DDCourse`.
+
+Versions 1.5.0 and older must install 1.5.5 manually once. Later releases can then be installed from inside the app.
 
 ## Back up and restore learning progress
 
@@ -90,24 +96,16 @@ Files from another app, unknown format versions, negative times, and incomplete 
 
 See [Learning progress JSON format](./PROGRESS_FORMAT.md) for the complete field reference and manual authoring instructions. Version 1.2.1 automatically migrates legacy video IDs that include modification times.
 
-### Browser installation
+### Local browser development
 
-1. Open the deployed DDCourse site in the latest Chrome or Microsoft Edge.
-2. Select **Install app** in the top-right corner.
-3. Confirm the prompt. DDCourse will appear on your desktop and in the Start menu, and will open in its own window.
-
-If the button is unavailable, open the browser menu and select **Install DDCourse** or **Apps → Install this site as an app**.
-
-### Web development
-
-Node.js 22.13 or newer is required.
+DDCourse no longer publishes an official Web site. The browser build remains available for local development and automated testing. Node.js 22.13 or newer is required.
 
 ```bash
 npm install
 npm run dev
 ```
 
-Open the local address printed in the terminal. Installability in development depends on the browser; the full PWA installation flow is available after deployment over HTTPS.
+Open the local address printed in the terminal.
 
 ## Keyboard shortcuts
 

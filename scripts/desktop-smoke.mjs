@@ -18,8 +18,18 @@ try {
     chooseFolder: typeof window.ddcourseDesktop?.chooseFolder,
     loadNotes: typeof window.ddcourseDesktop?.loadNotes,
     saveNotes: typeof window.ddcourseDesktop?.saveNotes,
+    revealPath: typeof window.ddcourseDesktop?.revealPath,
+    readSubtitle: typeof window.ddcourseDesktop?.readSubtitle,
+    checkForUpdates: typeof window.ddcourseDesktop?.checkForUpdates,
+    downloadUpdate: typeof window.ddcourseDesktop?.downloadUpdate,
+    installUpdate: typeof window.ddcourseDesktop?.installUpdate,
+    onUpdateStatus: typeof window.ddcourseDesktop?.onUpdateStatus,
   }));
-  assert.deepEqual(bridge, { chooseFolder: "function", loadNotes: "function", saveNotes: "function" });
+  assert.deepEqual(bridge, {
+    chooseFolder: "function", loadNotes: "function", saveNotes: "function",
+    revealPath: "function", readSubtitle: "function", checkForUpdates: "function",
+    downloadUpdate: "function", installUpdate: "function", onUpdateStatus: "function",
+  });
   await window.getByRole("button", { name: "选择课程文件夹" }).waitFor({ state: "visible", timeout: 15_000 });
   console.log(`Electron smoke test passed: ${packagedExecutable ? "packaged" : "development"} desktop window loaded the learning workspace.`);
 } finally {

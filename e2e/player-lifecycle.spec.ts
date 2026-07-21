@@ -22,11 +22,12 @@ test("switching collections fully stops and unloads the current video", async ({
   await page.goto("/");
   await loadCourse(page);
   await page.getByRole("button", { name: /01/ }).click();
-  await expect(page.locator("video")).toHaveClass(/visible/);
+  const player = page.locator(".player-wrap > video");
+  await expect(player).toHaveClass(/visible/);
 
   await page.getByRole("button", { name: /^B/ }).click();
-  await expect(page.locator("video")).not.toHaveClass(/visible/);
-  await expect.poll(() => page.locator("video").evaluate(element => { const video = element as HTMLVideoElement; return { src: video.getAttribute("src"), paused: video.paused }; }))
+  await expect(player).not.toHaveClass(/visible/);
+  await expect.poll(() => player.evaluate(element => { const video = element as HTMLVideoElement; return { src: video.getAttribute("src"), paused: video.paused }; }))
     .toEqual({ src: null, paused: true });
 });
 
@@ -39,6 +40,6 @@ test("reset stops playback before removing the active progress record", async ({
   page.once("dialog", dialog => dialog.accept());
   await page.getByRole("button", { name: "重置" }).click();
 
-  await expect(page.locator("video")).not.toHaveClass(/visible/);
+  await expect(page.locator(".player-wrap > video")).not.toHaveClass(/visible/);
   await expect.poll(() => page.evaluate(id => Object.hasOwn(JSON.parse(localStorage.getItem("lumacourse_progress_v1") || "{}"), id), fileId)).toBe(false);
 });
